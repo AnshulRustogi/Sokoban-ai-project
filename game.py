@@ -5,17 +5,92 @@ from pandas import *
 import os
 # import time
 
+
+# class State:
+
+# 	def stateFromFile(self, fileName):
+# 		self.fileName = fileName
+# 		if self.fileName == None:
+# 			raise Exception('File not found\nFile provide a valid file name')
+# 		try:
+# 			self.file = open(self.fileName, 'r')
+# 		except FileNotFoundError as E:
+# 			raise Exception('File not found\nFile provide a valid file name', E)
+			
+# 		self.walls = []
+# 		self.player = [0,0]
+# 		self.boxes = []
+# 		self.boxCount = 0
+# 		self.goals = []
+# 		fileGame = []
+# 		maxWidth = -1
+# 		for line in self.file:
+# 			if line.find('#') == -1:
+# 				continue
+# 			fileGame.append(line)
+# 			maxWidth = max( maxWidth, len(line))
+# 		self.fill_data(fileGame, maxWidth)
+		
+# 	def fill_data(self, fileGame, maxWidth):
+# 		self.walls = np.zeros((len(fileGame), maxWidth))
+# 		# self.name = ''.join(list(fileGame[0])[2:-1])
+		
+# 		for lineIndex, line in enumerate(fileGame):
+# 			for charIndex, char in enumerate(line):
+# 				if char == '#':
+# 					self.walls[lineIndex][charIndex] = 1
+# 				elif char == '$':
+# 					self.boxes.append([lineIndex, charIndex])
+# 					#self.walls[lineIndex][charIndex] = 2
+# 					self.boxCount += 1
+# 				elif char == '.':
+# 					self.goals.append([lineIndex, charIndex])
+# 				elif char == '@':
+# 					self.player = [lineIndex, charIndex]
+# 				elif char == '+':
+# 					self.goals.append([lineIndex, charIndex])
+# 					self.player = [lineIndex, charIndex]
+# 				elif char == '*':
+# 					self.boxes.append([lineIndex, charIndex])
+# 					self.boxCount += 1
+# 					self.goals.append([lineIndex, charIndex])
+# 				elif char == ' ' or char == '-':
+# 					pass
+# 				elif char == '\n':
+# 					break
+# 				else:
+# 					raise Exception('Invalid character in file: ', char)
+
+		
+# 		self.walls = self.walls.astype(int)
+# 		#self.boxes = np.array(self.boxes)
+# 		#self.goals = np.array(self.goals)
+# 		#self.player = np.array(self.player)
+# 		return
+		
+# 	def copy(self):
+# 		newState = State()
+# 		newState.walls = self.walls.copy()
+# 		newState.player = self.player.copy()
+# 		newState.boxes = self.boxes.copy()
+# 		newState.boxCount = self.boxCount
+# 		newState.goals = self.goals.copy()
+# 		return newState
+
 class Sokoban:
 	def __init__(
 		self, 
-		name='1', 
+		# name='1', 
 		fileName='game.xsb',
 		):
+		# self.state = State().stateFromFile(fileName)
+		# self.name = self.state.name
 		
-		self.name = name
+		# self.name = name
 		self.fileName = fileName
 		if self._checkExistAndOpen():
 			raise Exception('File not found\nFile provide a valid file name')
+		
 		self.create_instance()
 	
 	def _checkExistAndOpen(self):
@@ -38,15 +113,17 @@ class Sokoban:
 		fileGame = []
 		maxWidth = -1
 		for line in self.file:
+			if line.find('#') == -1:
+				continue
 			fileGame.append(line)
 			maxWidth = max( maxWidth, len(line))
 		self.fill_data(fileGame, maxWidth)
 	
 	def fill_data(self, fileGame, maxWidth):
-		self.walls = np.zeros((len(fileGame[1:]), maxWidth))
-		self.name = ''.join(list(fileGame[0])[2:-1])
+		self.walls = np.zeros((len(fileGame), maxWidth))
+		# self.name = ''.join(list(fileGame[0])[2:-1])
 		
-		for lineIndex, line in enumerate(fileGame[1:]):
+		for lineIndex, line in enumerate(fileGame):
 			for charIndex, char in enumerate(line):
 				if char == '#':
 					self.walls[lineIndex][charIndex] = 1
@@ -79,12 +156,12 @@ class Sokoban:
 		#self.player = np.array(self.player)
 		return
 
-	def check_game_over(self, count=False):
+	def check_game_over(self):
 		countInPlace = 0
 		for box in self.boxes:
 			if box in self.goals:
 				countInPlace += 1
-		return countInPlace
+		return countInPlace == self.boxCount
 	
 	def print_visual(self):
 		tempData = self.walls.tolist()
@@ -206,7 +283,7 @@ def main():
 	#Create instance of class Sokoban
 	game = Sokoban()
 	#Make a while loop that runs until game is over and checks if the game is over using game.check_game_over(count=False)
-	while game.check_game_over(count=True) != game.boxCount:
+	while not game.check_game_over():
 		
 		# os.system('cls||clear')
 		
@@ -235,7 +312,8 @@ def main():
 		if game.boxMoved == True:
 			print("Box moved")
 		#Check if the game is over using game.check_game_over(count=False)
-		if game.check_game_over(count=False) == game.boxCount:
+		if game.check_game_over():
+			print("Game over")
 			print("Game over")
 			break
 	
