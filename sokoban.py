@@ -4,29 +4,33 @@ from pandas import DataFrame
 from IPython.display import display
 import sys
 import copy 
-
+from state import State
 
 #sys.tracebacklimit = 0
 class Sokoban(Puzzle):
 
     def __init__(self,
             state=None,
-            test_name="Game",
-            test_file="sokoban.xsb"
+            test_name=None,
+            test_file=None
             ):
-        if state is None:
+        if test_file is not None:
             self.test_name = test_name
             self.test_file = test_file
-
             if self.does_file_exist():
-                self.read_file()
-        else:
-            self.generate_board_from_state(state, test_name)
+                self.state = self.read_file()
+                return
+    
 
+    '''
     def generate_board_from_state(self, state, test_name: str):
         self.test_name = test_name
         gameWidth = len(state[0])
         return self.generate_board(gameWidth, state, from_state=False)
+    '''
+
+    def initial_state(self):
+        return self.state
 
     def does_file_exist(self):
         try:
@@ -39,15 +43,14 @@ class Sokoban(Puzzle):
     def read_file(self):
         gameWidth = -1
         game_raw = []
-
         for line in self.file:
             game_raw.append(line)
             gameWidth = max(gameWidth, len(line))
         #("File read successfully")
-        self.generate_board(gameWidth, game_raw)
+        return self.generate_board(gameWidth, game_raw)
     
     #Generate board from file data
-    def generate_board(self, gameWidth: int, game_raw: list, from_state=True) -> None:
+    def generate_board(self, gameWidth: int, game_raw: list) -> State:
         '''
         Labels:
         0 = empty space
@@ -84,47 +87,53 @@ class Sokoban(Puzzle):
         boxes - the boxes' positions
         goals - the goals' positions
         '''
-        self.gameHeight = len(game_raw[1:] if from_state else game_raw)
-        if from_state:
-            self.test_name = ''.join(list(game_raw[0])[2:-1])
+        self.gameHeight = len(game_raw)-1
+        self.name = ''.join(list(game_raw[0])[1:])
         self.gameWidth = gameWidth 
         self.game = [[0 for x in range(self.gameWidth)] for y in range(self.gameHeight)]
-        self.boxes = set()
+        boxes = set()
         self.goal = set()
-        self.player = (-1, -1)
+        player = (-1, -1)
 
         #Generate board from file and find player, boxes and goals
-        for row, line in enumerate(game_raw[1:] if from_state else game_raw):
+        for row, line in enumerate(game_raw[1:]):
             for col, char in enumerate(line):
-                if char == ' ' or char == 0:
-                    self.game[row][col] = 0
-                elif char == '#' or char == 1:
+                if char == ' ':
+                    continue
+                #    self.game[row][col] = 0
+                if char == '#':
                     self.game[row][col] = 1
-                elif char == '$' or char == 2:
-                    self.game[row][col] = 2
-                    self.boxes.add((row, col))
-                elif char == '.' or char == 3:
-                    self.game[row][col] = 3
+                    continue
+                if char == '$':
+                #    self.game[row][col] = 2
+                    boxes.add((row, col))
+                elif char == '.':
+                    #self.game[row][col] = 3
                     self.goal.add((row, col))
-                elif char == '*' or char == 4:
-                    self.game[row][col] = 4
-                    self.boxes.add((row, col))
+                elif char == '*':
+                    #self.game[row][col] = 4
+                    boxes.add((row, col))
                     self.goal.add((row, col))
-                elif char == '@' or char == 5:
-                    self.game[row][col] = 5
-                    self.player = (row, col)
-                elif char == '+' or char == 6:
-                    self.game[row][col] = 6
-                    self.player = (row, col)
+                elif char == '@':
+                #    self.game[row][col] = 5
+                    player = (row, col)
+                elif char == '+':
+                #    self.game[row][col] = 6
+                    player = (row, col)
+                    self.goal.add((row, col))
                 elif char == '\n':
                     break
                 else:
                     raise ValueError("Invalid character %s" % char)
         #print("Board generated successfully")
-        return True
+        return State(player, boxes, None)
 
     #Make the move
-    def move(self, direction: str, update_self=False):
+    def move(self, state: State, direction: str):
+        '''
+        If the move is valid it returns the new state, move else returns None
+        '''
+
         '''
         Moves the player in the given direction
         Possible directions are:
@@ -146,14 +155,15 @@ class Sokoban(Puzzle):
         #Check if the direction is valid
         if direction not in ['u', 'd', 'l', 'r']:
             raise ValueError("Invalid direction: %s" % direction)
+        player, boxes = state.player_pos, state.box_pos
 
         #Check if the player is on the board
-        if self.player == (-1, -1):
+        if player == (-1, -1):
             raise ValueError("Player not on board")
 
         #Check if box is moved
         box_moved = False
-
+        
         #Change
         delta = {
             'u': (-1, 0),
@@ -161,106 +171,111 @@ class Sokoban(Puzzle):
             'l': (0, -1),
             'r': (0, 1) 
         }
-        newGame = copy.deepcopy(self.game)
+        newState = copy.deepcopy(state)
         
         #Make the move
-        newPos = (self.player[0] + delta[direction][0], self.player[1] + delta[direction][1])
-        if newGame[newPos[0]][newPos[1]] in [0, 3]:
-            newGame[self.player[0]][self.player[1]] = 0
-            newGame[newPos[0]][newPos[1]] = 5
-            #If the player is on a goal
-            if newPos in self.goal:
-                newGame[newPos[0]][newPos[1]] = 6
-            #If the player was on a goal
-            if self.player in self.goal:
-                newGame[self.player[0]][self.player[1]] = 3
+        newPos = (player[0] + delta[direction][0], player[1] + delta[direction][1])
+        if self.game[newPos[0]][newPos[1]] in [0, 3]:
+            #Make current position empty
+            #self.game[player[0]][player[1]] = 0
+            #Make new position player
+            #self.game[newPos[0]][newPos[1]] = 5
+            newState.player_pos = newPos
             
-            if update_self:
-                self.player = newPos
+            #If the player is on a goal
+            #if newPos in self.goal:
+            #    self.game[newPos[0]][newPos[1]] = 6
+            #If the player was on a goal
+            #if player in self.goal:
+            #    self.game[player[0]][player[1]] = 3
+            
+            #if update_self:
+            #    player = newPos
 
         #Check if the new position is a wall
-        if newGame[newPos[0]][newPos[1]] == 1:
-            valid_move = False
-            return False
+        if self.game[newPos[0]][newPos[1]] == 1:
+            return None
 
         #Check if the new position is a box or if the box is on a goal
-        if newGame[newPos[0]][newPos[1]] in [2, 4]:
+        if newPos in boxes:
             newPositionDash = (newPos[0] + delta[direction][0], newPos[1] + delta[direction][1])
             #Check if the box is below a wall or another box or below a box on a goal
-            if newGame[newPositionDash[0]][newPositionDash[1]] in [1, 2, 4]:
-                valid_move = False
-                return False
+            if self.game[newPositionDash[0]][newPositionDash[1]]==1 or (newPositionDash in boxes):
+                return None
             #If the box is not below a wall or another box, move the box and update the game board
             else:
                 box_moved = True
                 #Set current position to empty space
-                newGame[self.player[0]][self.player[1]] = 0
+                #self.game[self.player[0]][self.player[1]] = 0
                 #Set new position to player
-                newGame[newPos[0]][newPos[1]] = 5
+                #self.game[newPos[0]][newPos[1]] = 5
+                newState.player_pos = newPos
                 #If the player is on a goal
-                if self.player in self.goal:
-                    newGame[newPos[0]][newPos[1]] = 6
-                if self.player in self.goal:
-                    newGame[self.player[0]][self.player[1]] = 3
+                #if self.player in self.goal:
+                #    self.game[newPos[0]][newPos[1]] = 6
+                #if self.player in self.goal:
+                #    self.game[self.player[0]][self.player[1]] = 3
                 
-                if update_self:
-                    self.player = newPos
-                newPositionDash = (newPos[0] + delta[direction][0], newPos[1] + delta[direction][1])
+                #if update_self:
+                #    self.player = newPos
                 
                 #Set the box's new position to a box
-                newGame[newPositionDash[0]][newPositionDash[1]] = 2
-                if update_self:
-                    self.boxes.add(newPositionDash)
-                    self.boxes.remove(newPos)
-                #Check if the new position of the box is a goal
-                if newPositionDash in self.goal:
-                    newGame[newPositionDash[0]][newPositionDash[1]] = 4
-        
-        return Sokoban(
-            state=newGame,
-            test_name=self.test_name
-        ), direction.upper() if box_moved else direction.lower()
+                #self.game[newPositionDash[0]][newPositionDash[1]] = 2
+                #if update_self:
+                #    self.boxes.add(newPositionDash)
+                #    self.boxes.remove(newPos)
+                newState.box_pos.add(newPositionDash)
+                newState.box_pos.remove(newPos)
 
-    def is_solved(self):
+
+                
+                #Check if the new position of the box is a goal
+                #if newPositionDash in self.goal:
+                #    self.game[newPositionDash[0]][newPositionDash[1]] = 4
+        newState.move_to_reach = direction.upper() if box_moved else direction.lower()
+        return newState
+
+    def is_solved(self, state: State):
         '''
         Checks if the game is solved i.e. all boxes are on goals
         '''
-        return self.boxes == self.goal
+        return state.box_pos == self.goal
 
-    def print_board(self) -> None:
+    def print_board(self,state) -> None:
         '''
         Prints the board
         '''
-        tempData = DataFrame(self.game).replace(0, ' ').replace(1, '#').replace(2, '$').replace(3, '.').replace(4, '*').replace(5, '@').replace(6, '+')
-        #display(tempData)
+
+        tempData = DataFrame(self.game).replace(0, ' ').replace(1, '#')
+        for goal in self.goal:
+            tempData.iloc[goal[0], goal[1]] = '.'
+
+        if state.player_pos in self.goal:
+            tempData.loc[state.player_pos] = '+'
+        else:
+            tempData.loc[state.player_pos[0], state.player_pos[1]] = '@'
+        for box in state.box_pos:
+            if box in self.goal:
+                tempData.loc[box[0], box[1]] = '*'
+            else:
+                tempData.loc[box[0], box[1]] = '$'
+
         print(tempData)
         return
-
-    def __str__(self) -> str:
-        '''
-        Returns the board as a string
-        '''
-        #Convert the board (dtype: list of list) to string
-        st = '; %s\n' % self.test_name
-        for row in self.game:
-            for col in row:
-                st += str(col)
-            st += '\n'
-        return st
-    
-    def succesors(self) -> list or None:
+ 
+    def succesors(self, state: State) -> list[State]:
         '''
         Returns a list of all possible moves
         '''
         child = []
         for direction in ['u', 'd', 'l', 'r']:
-            if self.move(direction):
+            if self.move(state, direction):
                 #yield self.move(direction)
-                child.append(self.move(direction))
+                child.append(self.move(state, direction))
         return child      
 
     #Check for all possible deadend in the board
-    def deadend(self) -> bool:
+    def deadend(self, state: State) -> bool:
         '''
         Checks if the board is a deadend
         Deadend1: A box is in a ditch and is not on a goal
@@ -294,44 +309,41 @@ class Sokoban(Puzzle):
             '''   
         return False
 
-
     @staticmethod
     def get_box_coords(state):
-        return [(i, j) for i in range(len(state)) for j in range(len(state)) if state[i][j] in [2, 4]]
+        '''
+        Returns a list of box coordinates
+        '''
+        return state.box_pos
 
     @staticmethod
     def get_player_coords(state: str):
-        return [(i, j) for i in range(len(state)) for j in range(len(state)) if state[i][j] in [5, 6]][0]
-
-    @staticmethod
-    def get_goal_coords(state):
-        return [(i, j) for i in range(len(state)) for j in range(len(state[0])) if state[i][j] in [3, 4]]
+        '''
+        Returns the player coordinates
+        '''
+        return state.player_pos
 
 if __name__=="__main__":
     game = Sokoban(test_file="game.xsb")
-    #Make a while loop that runs until game is over and checks if the game is over using game.check_game_over()
-    #Puts the game into the string which can be used to load the game again
-    #temp = game.__str__()
-    
-    #gameTemp = Sokoban(state=temp)
-    game.print_board()
+    start_state = game.state
+    print("Game read from file")
+    game.print_board(start_state)
     #Play the game
-    while not game.is_solved():
+    current_state = start_state
+    while not game.is_solved(current_state):
         #Get the move from the user
         move = input("Enter the move: ")
         #Check if the move is valid
-        
-        if game.move(move):
-            game, _ = game.move(move)
-            #If the move is valid, print the board
-            game.print_board()
-            print("Boxes: ", game.boxes)
-            print("Player: ", game.player)
-            print("Is deadend: ", game.deadend())
+        last_state = current_state
+        current_state = game.move(current_state, move)
+        if current_state:
+            game.print_board(current_state)
+            print("Boxes: ", current_state.box_pos)
+            print("Player: ", current_state.player_pos)
+            print("Move to reach: ", current_state.move_to_reach)
         else:
-            #If the move is not valid, print the board and ask for another move
             print("Invalid move")
-            game.print_board()
+            current_state = last_state
 
                     
 

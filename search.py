@@ -1,7 +1,7 @@
 from sokoban import Sokoban
 from node import Node
 import sys
-
+from state import State
 class Search():
 	BFS = 1
 	DFS = 2
@@ -48,7 +48,7 @@ heuristics = [
 	lambda puzzle: sum([((puzzle.__str__()[i] - i) % 3) ** 2 + ((puzzle.__str__()[i] - i) // 3) ** 2 for i in range(9) if puzzle.__str__()[i] != 0]) + sum([1 for i in range(9) if (puzzle.__str__()[i] != i - 1 or (i == 8 and puzzle.__str__()[i] != 0))]),
 ]
 
-def solve(puzzle):
+def solve(state: State):
 	print("Search type: \n1. BFS\n2. DFS\n3. DLS\n4. IDS\n5. A*")
 	searchType = int(input())
 	
@@ -89,7 +89,7 @@ def solve(puzzle):
 			
 			openList = []
 			closed = []
-			openList.append(Node(puzzle, None, 0))
+			openList.append(Node(state, None, 0))
 			
 			if heuristicType == 5:
 				f = lambda Node: Node.depth + 2 * h(Node.puzzle)
@@ -99,7 +99,7 @@ def solve(puzzle):
 	else:
 		openList = []
 		closed = []
-		openList.append(Node(puzzle, None, 0))
+		openList.append(Node(state, None, 0))
 
 		loop(openList, closed, searchType, dlsDepth, f)
 
@@ -113,25 +113,23 @@ def loop(
 ):
 	while openList:
 		current = openList.pop(0)
-		closed.append(current.puzzle.__str__())
-		#sys.stdout.write(
-		#	"\r" + ''.join(map(str, current.puzzle.__str__())) + 
-		#	" " + str(len(openList)) +
-		#	" " + str(len(closed))
-		#	)
+		closed.append(current.puzzle)
+		sys.stdout.write(
+			"\r" + str(len(closed)) + " nodes expanded, " + str(len(openList)) + " nodes in the open"
+			)
 		sys.stdout.flush()
 		
-		if current.puzzle.is_solved():
+		if game.is_solved(current.puzzle):
 			print("\nSolution found: " + str(current.depth) + " moves")
 			while current:
-				print(current.puzzle.print_board())
+				game.print_board(current.puzzle)
 				current = current.parent
 			return True
 		
 		else:
 			# i = current.puzzle.__str__().index(0)
-			for new, move in current.puzzle.succesors():
-				if new is not None and new.__str__() not in closed:
+			for new in game.succesors(current.puzzle):
+				if new is not None and new not in closed:
 					newNode = Node(new, current, current.depth + 1)
 					appendNewNode(openList, newNode, searchType, dlsDepth, heuristic)
 	
@@ -143,38 +141,38 @@ def loop(
 			print("No solution found")
 
 def main():
-    puzzle = Sokoban(test_file="game.xsb")
-    
-    puzzle.print_board()
-    
-    print("1. Play")
-    print("2. Solve")
-    print("3. Random")
-    print("4. Exit")
-    choice = int(input())
-    if choice == 1:
-        while True:
-            temp = puzzle.move(input("Please enter a move [u, d, l, r]: "))
-            if temp is not None:
-                puzzle = temp[0]
-                puzzle.print_board()
-                print("Box Moved: " + str(temp[1]))
-                if puzzle.is_solved():
-                    print("You win!")
-                    break
-         
-    elif choice == 2:
-        solve(puzzle)
-    #elif choice == 3:
-    #	puzzle = puzzle.play(10)
-    #	puzzle.print_board()
-    elif choice == 3:
-        return
-    elif choice == 4:
-        return
-    else:
-        print("Invalid input")
-        return
+	global game
+	game = Sokoban(test_file="test1.xsb")
+	state = game.initial_state()
+	
+	print("1. Play")
+	print("2. Solve")
+	print("3. Random")
+	print("4. Exit")
+	choice = int(input())
+	if choice == 1:
+		while True:
+			temp = game.move(state, input("Please enter a move [u, d, l, r]: "))
+			if temp is not None:
+				state = temp
+				game.print_board(state)
+				print("Move made: " + state.move_to_reach)
+				if game.is_solved(state):
+					print("You win!")
+					break
+		 
+	elif choice == 2:
+		solve(state)
+	#elif choice == 3:
+	#	puzzle = puzzle.play(10)
+	#	puzzle.print_board()
+	elif choice == 3:
+		return
+	elif choice == 4:
+		return
+	else:
+		print("Invalid input")
+		return
 
 	
 if __name__ == '__main__':
