@@ -3,6 +3,7 @@ import numpy as np
 # import matplotlib.pyplot as plt
 from pandas import *
 import os
+# import copy
 # import time
 
 
@@ -81,16 +82,17 @@ class Sokoban:
 	def __init__(
 		self, 
 		# name='1', 
-		fileName='game.xsb',
+		# fileName='game.xsb',
+		file
 		):
 		# self.state = State().stateFromFile(fileName)
 		# self.name = self.state.name
-		
 		# self.name = name
-		self.fileName = fileName
-		if self._checkExistAndOpen():
-			raise Exception('File not found\nFile provide a valid file name')
 		
+		# self.fileName = fileName
+		# if self._checkExistAndOpen():
+		# 	raise Exception('File not found\nFile provide a valid file name')
+		self.file = file
 		self.create_instance()
 	
 	def _checkExistAndOpen(self):
@@ -118,6 +120,7 @@ class Sokoban:
 			fileGame.append(line)
 			maxWidth = max( maxWidth, len(line))
 		self.fill_data(fileGame, maxWidth)
+		self.validMove = True
 	
 	def fill_data(self, fileGame, maxWidth):
 		self.walls = np.zeros((len(fileGame), maxWidth))
@@ -278,6 +281,17 @@ class Sokoban:
 			# raise Exception('Invalid direction: ', direction)
 			print('Invalid direction: ', direction)
 		return 0
+		
+	def copy(self):
+		# return copy.deepcopy(self)
+		new = Sokoban(self.file)
+		new.walls = self.walls.copy()
+		new.boxes = self.boxes.copy()
+		new.goals = self.goals.copy()
+		new.player = self.player.copy()
+		new.validMove = self.validMove
+		return new
+		
 				
 def main():
 	#Create instance of class Sokoban
