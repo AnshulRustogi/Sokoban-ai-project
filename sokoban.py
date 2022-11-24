@@ -278,6 +278,9 @@ class Sokoban(Puzzle):
             if self.move(state, direction):
                 #yield self.move(direction)
                 child.append(self.move(state, direction))
+
+        #Rearrange child depending on whether a box is moved or not
+        child = sorted(child, key=lambda x: x.move_to_reach.isupper(), reverse=True)
         return child      
         
     # def getBlockMoves(self, state: State) -> list[State]:
