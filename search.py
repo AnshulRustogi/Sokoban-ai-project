@@ -1,3 +1,4 @@
+import math
 from sokoban import Sokoban
 from node import Node
 import sys
@@ -96,6 +97,14 @@ def pullDistance(state: State):
 	#print(row_ind, col_ind)
 	#sys.exit()
 	h = sum( [distance_box_goal[i,j] for i,j in zip(row_ind, col_ind)])
+	
+	#Calculate distance between player and each box
+	distance_player_box = np.zeros((len(state.box_pos)))
+	for i, box_position in enumerate(state.box_pos):
+		distance_player_box[i] = abs(box_position[0] - state.player_pos[0]) + abs(box_position[1] - state.player_pos[1]) - 1
+
+	h += min(distance_player_box)
+
 	return h
 
 #Implement above algorithm
@@ -244,6 +253,8 @@ def main():
 	given_games = []
 	new_game = []
 	for line in lines:
+		if line == "\n":
+			continue
 		if ';' in line:
 			given_games.append(new_game)
 			new_game = [line]
