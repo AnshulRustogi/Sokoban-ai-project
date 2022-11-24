@@ -9,3 +9,11 @@ class Node:
         '''
         self.heuristic = heuristic
         self.fn_value = self.depth + self.heuristic'''
+
+    def __lt__(self, other):
+        return self.state.heuristicValue < other.state.heuristicValue
+
+    def __eq__(self, other):
+        return self.state == other.state
+
+        
