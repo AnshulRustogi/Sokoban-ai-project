@@ -11,6 +11,7 @@ class Sokoban(Puzzle):
 
     def __init__(self,
             state=None,
+            state_width=0,
             test_name=None,
             test_file=None
             ):
@@ -20,7 +21,9 @@ class Sokoban(Puzzle):
             if self.does_file_exist():
                 self.state = self.read_file()
                 return
-    
+        if state is not None:
+            self.state = self.generate_board(state_width, state)
+            return
 
     '''
     def generate_board_from_state(self, state, test_name: str):
@@ -92,9 +95,11 @@ class Sokoban(Puzzle):
         self.name = ''.join(list(game_raw[0])[1:])
         self.gameWidth = gameWidth 
         self.game = [[0 for x in range(self.gameWidth)] for y in range(self.gameHeight)]
-        self.boxes = set()
+        boxes = set()
         self.goal = set()
-        self.player = (-1, -1)
+        self.goal_dict = {}
+        player = (-1, -1)
+        self.number_of_goal = 0
         
         #Generate board from file and find player, boxes and goals
         for row, line in enumerate(game_raw[1:]):
@@ -107,28 +112,30 @@ class Sokoban(Puzzle):
                     continue
                 if char == '$':
                 #    self.game[row][col] = 2
-                    self.boxes.add((row, col))
+                    boxes.add((row, col))
                 elif char == '.':
                     #self.game[row][col] = 3
                     self.goal.add((row, col))
                 elif char == '*':
                     #self.game[row][col] = 4
-                    self.boxes.add((row, col))
+                    boxes.add((row, col))
                     self.goal.add((row, col))
+                    self.number_of_goal += 1
                 elif char == '@':
                 #    self.game[row][col] = 5
-                    self.player = (row, col)
+                    player = (row, col)
                 elif char == '+':
                 #    self.game[row][col] = 6
-                    self.player = (row, col)
+                    player = (row, col)
                     self.goal.add((row, col))
+                    self.number_of_goal += 1
                 elif char == '\n':
                     break
                 else:
                     raise ValueError("Invalid character %s" % char)
         #print("Board generated successfully")
-        
-        return State(self.player, self.boxes, None)
+        self.goal_dict = {i: goal for i, goal in enumerate(self.goal)}
+        return State(player, boxes, None)
 
     #Make the move
     def move(self, state: State, direction: str):
@@ -228,8 +235,6 @@ class Sokoban(Puzzle):
                 #    self.boxes.remove(newPos)
                 newState.box_pos.add(newPositionDash)
                 newState.box_pos.remove(newPos)
-
-                
                 #Check if the new position of the box is a goal
                 #if newPositionDash in self.goal:
                 #    self.game[newPositionDash[0]][newPositionDash[1]] = 4
@@ -275,9 +280,9 @@ class Sokoban(Puzzle):
         '''
         child = []
         for direction in ['u', 'd', 'l', 'r']:
-            if self.move(state, direction):
-                #yield self.move(direction)
-                child.append(self.move(state, direction))
+            temp = self.move(state, direction)
+            if temp is not None:
+                child.append(temp)
 
         #Rearrange child depending on whether a box is moved or not
         child = sorted(child, key=lambda x: x.move_to_reach.isupper(), reverse=True)
@@ -343,10 +348,27 @@ class Sokoban(Puzzle):
         '''
         return state.player_pos
 
-if __name__=="__main__":    
-    game = Sokoban(test_file="test1.xsb")
+if __name__=="__main__":   
+    test_file = "sampleCSD311.xsb"
+    read_file = open(test_file, "r")
+    lines = read_file.readlines()
+    read_file.close()
+    game_states = []
+    newGame = []
+    for line in lines:
+        if ';' in line:
+            game_states.append(newGame)
+            newGame = [line]
+        else:
+            newGame.append(line)
+    game_states.append(newGame)
+    game_states = game_states[1:]
+    print(game_states)
+    print("Number of games: ", len(game_states))
+    game_number = int(input("Please enter the game number you want to play: ")) - 1
+    gameLen = max(len(line) for line in game_states[game_number])
+    game = Sokoban(state=game_states[game_number], state_width=gameLen)
     start_state = game.state
-    print("Game read from file")
     game.print_board(start_state)
     #Play the game
     current_state = start_state
