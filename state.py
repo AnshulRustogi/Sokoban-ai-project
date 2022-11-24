@@ -3,6 +3,7 @@ class State:
         self.player_pos = player_pos
         self.box_pos = box_pos
         self.move_to_reach = move_to_reach
+        self.heuristicValue = -1
 
     def __eq__(self, other: 'State') -> bool:
         return self.player_pos == other.player_pos and self.box_pos == other.box_pos
