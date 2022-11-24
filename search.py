@@ -31,9 +31,11 @@ def appendNewNode(
 			nodes.insert(0, newNode)
 	elif searchType == Search.AStar:
 		for i in range(len(nodes)):
-			# if heuristic(newNode) < heuristic(nodes[i]):
-			if (newNode.depth + newNode.state.heuristicValue) < (nodes[i].depth + nodes[i].state.heuristicValue):
-			# if newNode.state.heuristicValue < nodes[i].state.heuristicValue:
+			'''
+			Uniform Search and A*
+			'''
+			# if (newNode.depth + newNode.state.heuristicValue) < (nodes[i].depth + nodes[i].state.heuristicValue):
+			if newNode.state.heuristicValue < nodes[i].state.heuristicValue:
 				nodes.insert(i, newNode)
 				return
 		nodes.append(newNode)
@@ -199,7 +201,7 @@ def loop(
 
 def main():
 	global game
-	game = Sokoban(test_file="game.xsb")
+	game = Sokoban(test_file="test3.xsb")
 	
 	state = game.initial_state()
 	
