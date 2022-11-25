@@ -13,7 +13,10 @@ class Node:
     def __lt__(self, other):
         return self.state.heuristicValue < other.state.heuristicValue
 
-    def __eq__(self, other):
+    def __eq__(self, other: 'Node'):
         return self.state == other.state
+
+    def __hash__(self):
+        return hash((self.state, self.parent, self.depth))
 
         
