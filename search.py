@@ -48,6 +48,8 @@ def appendNewNode(
 		#	#	nodes.insert(i, newNode)
 		#	#	return
 		#nodes.append(newNode)
+		if newNode.state.heuristicValue > pow(10, 5):
+			return
 		heapq.heappush(nodes, (newNode.state.heuristicValue, newNode))
 		
 		# else:
@@ -82,7 +84,6 @@ def manhattanDistance(state: State):
 
 #Assign a box to a goal using hungarian algorithm
 def pullDistance(state: State):
-	#Calculate distances as a weighted undirected bipartite graph D = (VD,ED).
 	#Compute distance between each box and each goal
 	distance_box_goal = np.zeros((len(state.box_pos), len(game.goal)))
 	#Calculate distance between each box and each goal efficiently
@@ -102,9 +103,7 @@ def pullDistance(state: State):
 	distance_player_box = np.zeros((len(state.box_pos)))
 	for i, box_position in enumerate(state.box_pos):
 		distance_player_box[i] = abs(box_position[0] - state.player_pos[0]) + abs(box_position[1] - state.player_pos[1]) - 1
-
 	h += min(distance_player_box)
-
 	return h
 
 #Implement above algorithm
@@ -188,16 +187,18 @@ def solve(state: State, searchType: int, heuristicType: int, dlsDepth: int = 0, 
 		loop(openList, closed, searchType, dlsDepth, f, printStates)
 
 def loop(
-	openList :list[Node],
+	openList :list[tuple],
 	closed :list[State],
 	searchType,
 	dlsDepth,
 	heuristic = (lambda _: 0),
 	printStates = 0,
 ):
+	openList_set = set(openList)
 	while openList:
 		#current = openList.pop(0)
-		current = heapq.heappop(openList)[1]
+		current_heuristicvalue, current = heapq.heappop(openList)
+		openList_set.remove((current_heuristicvalue, current))
 		closed.append(current.state)
 		sys.stdout.write(
 			"\r" + str(len(closed)) + " nodes expanded, " 
@@ -231,8 +232,10 @@ def loop(
 			for new in game.succesors(current.state):
 				if new is not None:
 					new.heuristicValue = heuristic(new)
-				if new is not None and new not in closed:
-					newNode = Node(new, current, current.depth + 1)
+				newNode = Node(new, current, current.depth + 1)
+				if new is not None and new not in closed and (new.heuristicValue, newNode) not in openList_set:
+					openList_set.add((new.heuristicValue, newNode))
+					#newNode = Node(new, current, current.depth + 1)
 					appendNewNode(openList, newNode, searchType, dlsDepth, heuristic)
 					
 	if searchType == Search.IDS:
@@ -245,7 +248,7 @@ def loop(
 def main():
 	global game, dist_goal2position
 
-	test_file = "test4.xsb"
+	test_file = "temp.xsb"
 	read_file = open(test_file, "r")
 	lines = read_file.readlines()
 	read_file.close()
