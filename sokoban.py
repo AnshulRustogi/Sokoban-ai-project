@@ -313,31 +313,32 @@ class Sokoban(Puzzle):
         # matrix = map
         box_pos = state.box_pos
         # stop clause - not reinvoking for when there's floor and a box position and a wall.
-        if state[x][y] not in [1, 2, 4] and matrix[x][y] == 0:
+        if self.game[x][y] not in [1, 2, 4] and matrix[x][y] == 0:
             matrix[x][y] = 1
-
+            
             # checks future pos is box
             if (x - 1, y) in box_pos:
-                if state[x - 2][y] != 1 and (x - 2, y) not in box_pos:
+                if self.game[x - 2][y] != 1 and (x - 2, y) not in box_pos:
                     path_list.append(current_path + 'u')
             if (x + 1, y) in box_pos:
-                if state[x + 2][y] != 1 and (x + 2, y) not in box_pos:
+                if self.game[x + 2][y] != 1 and (x + 2, y) not in box_pos:
                     path_list.append(current_path + 'd')
             if (x, y - 1) in box_pos:
-                if state[x][y - 2] != 1 and (x, y - 2) not in box_pos:
+                if self.game[x][y - 2] != 1 and (x, y - 2) not in box_pos:
                     path_list.append(current_path + 'l')
             if (x, y + 1) in box_pos:
-                if state[x][y + 2] != 1 and (x, y + 2) not in box_pos:
+                if self.game[x][y + 2] != 1 and (x, y + 2) not in box_pos:
                     path_list.append(current_path + 'r')
 
             # checks each direction if visited, if wall, if box
-            if state[x - 1][y] != 1 and (x - 1, y) not in box_pos and matrix[x - 1][y] == 0:
+            if self.game[x - 1][y] != 1 and (x - 1, y) not in box_pos and matrix[x - 1][y] == 0:
                 self.flood_fill(state, matrix, path_list, current_path + 'u', x - 1, y)
-            if state[x + 1][y] != 1 and (x + 1, y) not in box_pos and matrix[x + 1][y] == 0:
+            if self.game[x + 1][y] != 1 and (x + 1, y) not in box_pos and matrix[x + 1][y] == 0:
                 self.flood_fill(state, matrix, path_list, current_path + 'd', x + 1, y)
-            if state[x][y - 1] != 1 and (x, y - 1) not in box_pos and matrix[x][y - 1] == 0:
+            if self.game[x][y - 1] != 1 and (x, y - 1) not in box_pos and matrix[x][y - 1] == 0:
                 self.flood_fill(state, matrix, path_list, current_path + 'l', x, y - 1)
-            if state[x][y + 1] != 1 and (x, y + 1) not in box_pos and matrix[x][y + 1] == 0:
+            if self.game[x][y + 1] != 1 and (x, y + 1) not in box_pos and matrix[x][y + 1] == 0:
+                # self.flood_fill(self.game, matrix, path_list, current_path + 'r', x, y + 1)
                 self.flood_fill(state, matrix, path_list, current_path + 'r', x, y + 1)
 
             return path_list
@@ -356,24 +357,26 @@ class Sokoban(Puzzle):
                 player = (player[0], player[1] + 1)
         return player
 
-    def expand(self, s):
-        if self.dead_end(s):
-            return []
+    def expand(self, state):
+        # if self.dead_end(state):
+        #     return []
 
-        for i in self.map:
-            for j in i:
-                j.visited = False
+        matrix = [[0 for _ in range(self.gameWidth)] for _ in range(self.gameHeight)]
+        path_list = self.flood_fill(state, matrix, [], '', state.player_pos[0], state.player_pos[1])
+        # path_list = self.flood_fill(state, self.map, list(), '', state.data[0][0], state.data[0][1])
 
-        path_list = self.flood_fill(s, self.map, list(), '', s.data[0][0], s.data[0][1])
 
         new_states = []
         for path in path_list:
             # Move player
-            new_player = self.get_position_from_path(s.data[0], path)
+            # new_player = self.get_position_from_path(state.data[0], path)
+            new_player = self.get_position_from_path(state.player_pos, path)
 
             # Move the box
-            box_index = list(s.data[1:]).index(new_player)
-            new_boxes = list(s.data[1:])
+            # box_index = list(state.data[1:]).index(new_player)
+            # new_boxes = list(state.data[1:])
+            box_index = list(state.box_pos).index(new_player)
+            new_boxes = list(state.box_pos)
             if path[-1] == 'u':
                 new_boxes[box_index] = (new_boxes[box_index][0] - 1, new_boxes[box_index][1])
             elif path[-1] == 'd':
@@ -383,9 +386,14 @@ class Sokoban(Puzzle):
             elif path[-1] == 'r':
                 new_boxes[box_index] = (new_boxes[box_index][0], new_boxes[box_index][1] + 1)
 
+            # new_states.append((path, SokobanState(player=new_player, boxes=new_boxes), len(path)))  
             new_states.append(
-                (path, SokobanState(player=new_player, boxes=new_boxes), len(path)))  # consider the cost of each move
-            # new_states.append((path, SokobanState(player=new_player, boxes=new_boxes), 1))  # uniform cost for a box push
+                State(
+                    player_pos=new_player, 
+                    box_pos=new_boxes,
+                    move_to_reach=path
+                )
+            )
 
         return new_states
         

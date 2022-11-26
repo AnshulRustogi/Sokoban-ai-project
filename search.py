@@ -1,8 +1,9 @@
+import datetime
 import heapq
 
 import numpy as np
 import scipy.optimize
-
+import sys
 from node import Node
 from sokoban import Sokoban
 from state import State
@@ -198,15 +199,15 @@ def loop(
 		current = heapq.heappop(openList)[1]
 		closed.append(current.state)
 		
-		game.print_board(current.state)
-		input()
-		# sys.stdout.write(
-		# 	"\r" + str(len(closed)) + " nodes expanded, " 
-		# 	+ str(len(openList)) + " nodes in the open, "
-		# 	+ str(current.depth) + " moves, "
-		# 	+ str(current.state.heuristicValue) + " heuristic value"
-		# 	)
-		# sys.stdout.flush()
+		# game.print_board(current.state)
+		# input()
+		sys.stdout.write(
+			"\r" + str(len(closed)) + " nodes expanded, " 
+			+ str(len(openList)) + " nodes in the open, "
+			+ str(current.depth) + " moves, "
+			+ str(current.state.heuristicValue) + " heuristic value"
+			)
+		sys.stdout.flush()
 		
 		
 		
@@ -232,7 +233,8 @@ def loop(
 			print("")
 			return True
 		else:
-			for new in game.succesors(current.state):
+			# for new in game.succesors(current.state):
+			for new in game.expand(current.state):
 				if new is not None:
 					new.heuristicValue = heuristic(new)
 				if new is not None and new not in closed:
@@ -305,10 +307,12 @@ def main():
 		
 		state = game.initial_state()
 		# matrix of zeros with the same size as the board
-		matrix = [[0 for _ in range(game.width)] for _ in range(game.height)]
-		game.flood_fill(state, matrix, [], '', state.player_pos[0], state.player_pos[1])
-		# solve(state, searchType, heuristicType, dlsDepth, printStates)
+		# print(game.expand(state))
+		start = datetime.datetime.now()
 		
+		solve(state, searchType, heuristicType, dlsDepth, printStates)
+		
+		print("Time elapsed: " + str(datetime.datetime.now() - start))
 		#print("1. Play")
 		#print("2. Solve")
 		#print("3. Random")
