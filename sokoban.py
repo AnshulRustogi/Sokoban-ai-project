@@ -6,6 +6,20 @@ import sys
 import copy 
 from state import State
 
+delta = {
+            'u': (-1, 0),
+            'd': (1, 0),
+            'l': (0, -1),
+            'r': (0, 1) 
+        }
+
+class MapTile:
+    def __init__(self, wall=False, floor=False, target=False):
+        self.wall = wall
+        self.floor = floor
+        self.target = target
+        self.visited = None
+
 #sys.tracebacklimit = 0
 class Sokoban(Puzzle):
 
@@ -15,6 +29,7 @@ class Sokoban(Puzzle):
             test_name=None,
             test_file=None
             ):
+        self.memo = {}
         if test_file is not None:
             self.test_name = test_name
             self.test_file = test_file
@@ -53,6 +68,9 @@ class Sokoban(Puzzle):
         #("File read successfully")
         return self.generate_board(gameWidth, game_raw)
     
+    def isPositionValid(self, pos):
+        return 0 <= pos[0] < len(self.map) and 0 <= pos[1] < len(self.map[0])
+
     #Generate board from file data
     def generate_board(self, gameWidth: int, game_raw: list) -> State:
         '''
@@ -91,8 +109,9 @@ class Sokoban(Puzzle):
         boxes - the boxes' positions
         goals - the goals' positions
         '''
+        print(game_raw)
         self.gameHeight = len(game_raw)-1
-        self.name = ''.join(list(game_raw[0])[1:])
+        self.name = ''.join(list(game_raw[0])[1:][:-2])
         self.gameWidth = gameWidth 
         self.game = [[0 for x in range(self.gameWidth)] for y in range(self.gameHeight)]
         boxes = set()
@@ -134,7 +153,22 @@ class Sokoban(Puzzle):
                 else:
                     raise ValueError("Invalid character %s" % char)
         #print("Board generated successfully")
+        self.box_state = copy.deepcopy(boxes)
         self.goal_dict = {i: goal for i, goal in enumerate(self.goal)}
+
+        self.map = [[MapTile() for x in range(self.gameWidth)] for y in range(self.gameHeight)]
+        for row in range(self.gameHeight):
+            for col in range(self.gameWidth):
+                if self.game[row][col] == 1:
+                    self.map[row][col].wall = True
+                elif (row, col) in self.goal:
+                    self.map[row][col].target = True
+                else:
+                    self.map[row][col].floor = True
+        self.target = list(self.goal)
+        self.target.sort()
+        self.initial_box_pos = list(boxes)
+        self.initial_box_pos.sort()
         return State(player, boxes, None)
 
     #Make the move
@@ -174,12 +208,6 @@ class Sokoban(Puzzle):
         box_moved = False
         
         #Change
-        delta = {
-            'u': (-1, 0),
-            'd': (1, 0),
-            'l': (0, -1),
-            'r': (0, 1) 
-        }
         newState = copy.deepcopy(state)
         
         #Make the move
@@ -233,8 +261,16 @@ class Sokoban(Puzzle):
                 #if update_self:
                 #    self.boxes.add(newPositionDash)
                 #    self.boxes.remove(newPos)
-                newState.box_pos.add(newPositionDash)
-                newState.box_pos.remove(newPos)
+                #newState.box_pos.add(newPositionDash)
+                #newState.box_pos.remove(newPos)
+                #Create new tuple of boxes
+                newBoxes = set()
+                for box in boxes:
+                    if box == newPos:
+                        newBoxes.add(newPositionDash)
+                    else:
+                        newBoxes.add(box)
+                newState.box_pos = newBoxes
                 #Check if the new position of the box is a goal
                 #if newPositionDash in self.goal:
                 #    self.game[newPositionDash[0]][newPositionDash[1]] = 4
@@ -288,15 +324,200 @@ class Sokoban(Puzzle):
         child = sorted(child, key=lambda x: x.move_to_reach.isupper(), reverse=True)
         return child      
         
-    # def getBlockMoves(self, state: State) -> list[State]:
-    #     '''
-    #     Returns a list of all possible block pushes
-    #     '''    
-    #     child = []
-    #     # check all player reachable positions in the current state
-        
+    def flood_fill(self, current_state: State, path_list = list(), current_path = "", x=-1, y=-1):
+        box_pos = current_state.box_pos
+        if x == -1 and y == -1:
+            x, y = current_state.player_pos
+        # stop clause - not reinvoking for when there's floor and a box position and a wall.
+        if self.map[x][y].floor and not self.map[x][y].visited:
+            self.map[x][y].visited = True
+
+            # checks future pos is box
+            if (x - 1, y) in box_pos:
+                if self.game[x - 2][y] != 1 and (x - 2, y) not in box_pos:
+                    path_list.append(current_path + 'u')
+            if (x + 1, y) in box_pos:
+                if self.game[x + 2][y] != 1 and (x + 2, y) not in box_pos:
+                    path_list.append(current_path + 'd')
+            if (x, y - 1) in box_pos:
+                if self.game[x][y - 2] != 1 and (x, y - 2) not in box_pos:
+                    path_list.append(current_path + 'l')
+            if (x, y + 1) in box_pos:
+                if self.game[x][y + 2] != 1 and (x, y + 2) not in box_pos:
+                    path_list.append(current_path + 'r')
+
+            # checks each direction if visited, if wall, if box
+            if self.game[x - 1][y] != 1 and (x - 1, y) not in box_pos and not self.map[x - 1][y].visited:
+                self.flood_fill(current_state, path_list, current_path + 'u', x - 1, y)
+            if self.game[x + 1][y] != 1 and (x + 1, y) not in box_pos and not self.map[x + 1][y].visited:
+                self.flood_fill(current_state, path_list, current_path + 'd', x + 1, y)
+            if self.game[x][y - 1] != 1 and (x, y - 1) not in box_pos and not self.map[x][y - 1].visited:
+                self.flood_fill(current_state, path_list, current_path + 'l', x, y - 1)
+            if self.game[x][y + 1] != 1 and (x, y + 1) not in box_pos and not self.map[x][y + 1].visited:
+                self.flood_fill(current_state, path_list, current_path + 'r', x, y + 1)
+
+            return path_list
+
+        return path_list
+
+    def get_position_from_path(self, player, path):
+        for move in path:
+            player = (player[0] + delta[move][0], player[1] + delta[move][1])
+        return player
     
+    def expand(self, s: State) -> list:
+        if self.dead_end(s):
+            return []
+
+        for i in self.map:
+            for j in i:
+                j.visited = False
+
+        path_list = self.flood_fill(s, list(), '', s.player_pos[0], s.player_pos[1])
+
+        new_states = []
+        for path in path_list:
+            # Move player
+            new_player = self.get_position_from_path(s.player_pos, path)
+
+            # Move the box
+            box_index = list(s.box_pos).index(new_player)
+            new_boxes = list(s.box_pos)
+            if path[-1] == 'u':
+                new_boxes[box_index] = (new_boxes[box_index][0] - 1, new_boxes[box_index][1])
+            elif path[-1] == 'd':
+                new_boxes[box_index] = (new_boxes[box_index][0] + 1, new_boxes[box_index][1])
+            elif path[-1] == 'l':
+                new_boxes[box_index] = (new_boxes[box_index][0], new_boxes[box_index][1] - 1)
+            elif path[-1] == 'r':
+                new_boxes[box_index] = (new_boxes[box_index][0], new_boxes[box_index][1] + 1)
+
+            new_states.append(
+                (path, State(player_pos=new_player, box_pos=new_boxes, move_to_reach= ''.join([ path[:-1] + path[-1].upper() ])), len(path)))
+            # new_states.append((path, State(player=new_player, boxes=new_boxes), 1))  # uniform cost for a box push    
+
+        return new_states
+
+    def dead_end(self, s: State) -> bool:
+        return self.deadp(s)
+
+    def deadp(self, s: State) -> bool:
+        temp_boxes = s.box_pos
+        for box in list(temp_boxes):
+            if self.box_is_trapped(box, self.target, temp_boxes):
+                return True
+        return False
+
+    def box_is_trapped(self, box, targets, boxes):
+        if self.box_is_cornered(box, targets, boxes):
+            return True
+
+        adj_boxes = self.adj_box(box, boxes)
+        for i in adj_boxes:
+            if box not in targets and i not in targets:
+                if i['direction'] == 'vertical':
+                    if self.game[box[0]][box[1] - 1] == 1 and self.game[i['box'][0]][i['box'][1] - 1] == 1:
+                        return True
+                    elif self.game[box[0]][box[1] + 1] == 1 and self.game[i['box'][0]][i['box'][1] + 1] == 1:
+                        return True
+                if i['direction'] == 'horizontal':
+                    if self.game[box[0] - 1][box[1]] == 1 and self.game[i['box'][0] - 1][i['box'][1]] == 1:
+                        return True
+                    elif self.game[box[0] + 1][box[1]] == 1 and self.game[i['box'][0] + 1][i['box'][1]] == 1:
+                        return True
+
+        return None
+
+    def box_is_cornered(self, box, targets, boxes):
+        def row_is_trap(offset):
+            target_count = 0
+            box_count = 1
+            for direction in [-1, 1]:
+                index = box[1] + direction
+                while self.game[box[0]][index] != 1:
+                    if self.game[box[0] + offset][index] == 0:
+                        return None
+                    elif self.game[box[0]][index] == 2:
+                        target_count += 1
+                    elif (box[0], index) in boxes:
+                        box_count += 1
+                    index += direction
+
+            if box_count > target_count:
+                return True
+            return None
+
+        def column_is_trap(offset):
+            target_count = 0
+            box_count = 1
+            for direction in [-1, 1]:
+                index = box[0] + direction
+                while self.game[index][box[1]] != 1:
+                    if self.game[index][box[1] + offset] == 0:
+                        return None
+                    elif self.game[index][box[1]] == 2:
+                        target_count += 1
+                    elif (index, box[1]) in boxes:
+                        box_count += 1
+                    index += direction
+
+            if box_count > target_count:
+                return True
+            return None
+
+        # Literal corners
+        if box not in targets:
+            if self.game[box[0] - 1][box[1]] == 1 and self.game[box[0]][box[1] - 1] == 1:
+                return True
+            elif self.game[box[0] - 1][box[1]] == 1 and self.game[box[0]][box[1] + 1] == 1:
+                return True
+            elif self.game[box[0] + 1][box[1]] == 1 and self.game[box[0]][box[1] - 1] == 1:
+                return True
+            elif self.game[box[0] + 1][box[1]] == 1 and self.game[box[0]][box[1] + 1] == 1:
+                return True
+
+        # Expanded corners
+
+        if self.game[box[0] - 1][box[1]] == 1:
+            if row_is_trap(offset=-1):
+                return True
+        elif self.game[box[0] + 1][box[1]] == 1:
+            if row_is_trap(offset=1):
+                return True
+        elif self.game[box[0]][box[1] - 1] == 1:
+            if column_is_trap(offset=-1):
+                return True
+        elif self.game[box[0]][box[1] + 1] == 1:
+            if column_is_trap(offset=1):
+                return True
+
+        return None
+
+    def adj_box(self, box, boxes)->list:
+        adj = []
+        for i in boxes:
+            if box[0] - 1 == i[0] and box[1] == i[1]:
+                adj.append({'box': i, 'direction': 'vertical'})
+            elif box[0] + 1 == i[0] and box[1] == i[1]:
+                adj.append({'box': i, 'direction': 'vertical'})
+            elif box[1] - 1 == i[1] and box[0] == i[0]:
+                adj.append({'box': i, 'direction': 'horizontal'})
+            elif box[1] + 1 == i[1] and box[0] == i[0]:
+                adj.append({'box': i, 'direction': 'horizontal'})
+        return adj
+
+    def box_moved(self, current: State):
+        '''
+        Counts the number of boxes that have been moved
+        '''
+        moved = 0
+        for i in range(len(current.box_pos)):
+            if current.box_pos[i] != self.initial_box_pos[i]:
+                moved += 1
+        self.initial_box_pos = current.box_pos
+        return moved
     #Check for all possible deadend in the board
+    
     def deadend(self, state: State) -> bool:
         '''
         Checks if the board is a deadend
@@ -356,20 +577,20 @@ if __name__=="__main__":
     game_states = []
     newGame = []
     for line in lines:
-        if ';' in line:
+        if line == "\n" or ';' in line:
             game_states.append(newGame)
             newGame = [line]
         else:
             newGame.append(line)
     game_states.append(newGame)
     game_states = game_states[1:]
-    print(game_states)
     print("Number of games: ", len(game_states))
     game_number = int(input("Please enter the game number you want to play: ")) - 1
-    gameLen = max(len(line) for line in game_states[game_number])
+    gameLen = max(len(line) for line in game_states[game_number][1:]) - 1
     game = Sokoban(state=game_states[game_number], state_width=gameLen)
     start_state = game.state
     game.print_board(start_state)
+    print(game.expand(start_state))
     #Play the game
     current_state = start_state
     

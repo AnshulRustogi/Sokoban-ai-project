@@ -1,14 +1,11 @@
-import math
 from sokoban import Sokoban
 from node import Node
-import sys
 from state import State
 import numpy as np
 import scipy.optimize
 import heapq
-import threading
-import multiprocessing
-from multiprocessing import Pool
+import collections
+import sys
 
 class Search():
 	BFS = 1
@@ -22,7 +19,6 @@ def appendNewNode(
 	newNode :Node,
 	searchType,
 	dlsDepth=0,
-	heuristic = (lambda _: 0),
 	):
 	if searchType == Search.BFS:
 		nodes.append(newNode)
@@ -37,23 +33,9 @@ def appendNewNode(
 		if newNode.depth <= dlsDepth:
 			nodes.insert(0, newNode)
 	elif searchType == Search.AStar:
-		#for i in range(len(nodes)):
-		#	'''
-		#	Uniform Search and A*
-		#		'''
-		#	if newNode.state.heuristicValue > pow(2, 10):
-		#		return
-		#	## if (newNode.depth + newNode.state.heuristicValue) < (nodes[i].depth + nodes[i].state.heuristicValue):
-		#	#if newNode.state.heuristicValue < nodes[i].state.heuristicValue:
-		#	#	nodes.insert(i, newNode)
-		#	#	return
-		#nodes.append(newNode)
 		if newNode.state.heuristicValue > pow(10, 5):
 			return
-		heapq.heappush(nodes, (newNode.state.heuristicValue, newNode))
-		
-		# else:
-		# 	nodes.append(newNode)
+		heapq.heappush(nodes, (newNode.state.heuristicValue + newNode.depth, newNode))
 
 def boxesOutOfPlace(state: State):
 	a = np.array(state.box_pos)
@@ -110,6 +92,7 @@ def pullDistance(state: State):
 def distanceToGoal():
 	#Initialize distanceToGoal
 	distanceToGoal = np.zeros((len(game.goal), game.gameHeight, game.gameWidth))
+	print(distanceToGoal.shape)
 	distanceToGoal.fill(np.inf)
 	delta = {
 			'u': (-1, 0),
@@ -126,13 +109,88 @@ def distanceToGoal():
 			for direction in delta.values():
 				boxPosition = (position[0] + direction[0], position[1] + direction[1])
 				playerPosition = (position[0] + 2 * direction[0], position[1] + 2 * direction[1])
-				if distanceToGoal[i][boxPosition[0]][boxPosition[1]] == np.inf:
-					if not game.game[boxPosition[0]][boxPosition[1]]==1 and not game.game[playerPosition[0]][playerPosition[1]]==1:
+				if game.isPositionValid(boxPosition) and game.isPositionValid(playerPosition):
+					if distanceToGoal[i][boxPosition[0]][boxPosition[1]] == np.inf:
 						distanceToGoal[i][boxPosition[0]][boxPosition[1]] = distanceToGoal[i][position[0]][position[1]] + 1
 						queue.append(boxPosition)
 
 	return distanceToGoal
 
+class newHeuristic:
+	def __init__(self, problem = None):
+		self.problem = game
+		self.buff = self.calc_cost()
+		self.box_state = self.problem.box_state
+		self.memo = dict()
+
+	def calc_cost(self):
+		def flood(x, y, cost):
+			if not visited[x][y]:
+
+				# Update cost if less than previous target
+				if buff[x][y] > cost:
+					buff[x][y] = cost
+				visited[x][y] = True
+
+				# Check adjacent floors
+				if self.problem.map[x - 1][y].floor:
+					flood(x - 1, y, cost + 1)
+				if self.problem.map[x + 1][y].floor:
+					flood(x + 1, y, cost + 1)
+				if self.problem.map[x][y - 1].floor:
+					flood(x, y - 1, cost + 1)
+				if self.problem.map[x][y + 1].floor:
+					flood(x, y + 1, cost + 1)
+		buff = [[float('inf') for _ in j] for j in self.problem.map]
+		for target in self.problem.target:
+			visited = [[False for _ in i] for i in self.problem.map]
+			flood(target[0], target[1], 0)
+		print(buff)
+		sys.exit()
+		return buff
+
+	def flood(self, x, y, cost, buff, visited):
+		if not visited[x][y]:
+			if buff[x][y] > cost:
+				buff[x][y] = cost
+			visited[x][y] = True
+			if self.problem.map[x - 1][y].floor:
+				self.flood(x - 1, y, cost + 1, buff, visited)
+			if self.problem.map[x + 1][y].floor:
+				self.flood(x + 1, y, cost + 1, buff, visited)
+			if self.problem.map[x][y - 1].floor:
+				self.flood(x, y - 1, cost + 1, buff, visited)
+			if self.problem.map[x][y + 1].floor:
+				self.flood(x, y + 1, cost + 1, buff, visited)
+
+	def heuristic2(self, s: State):
+		box_pos = s.box_pos
+		if box_pos in self.memo:
+			return self.memo[box_pos]
+		targets = self.problem.target
+		matrix = self.problem.map
+		box_moves = self.problem.box_moved(s)
+		total = 0
+		targets_left = len(targets)
+		for val in box_pos:
+			if val not in targets:
+				if matrix[val[0] - 1][val[1]].wall and matrix[val[0]][val[1] - 1].wall:
+					self.memo[box_pos] = float('inf')
+					return float('inf')
+				elif matrix[val[0] - 1][val[1]].wall and matrix[val[0]][val[1] + 1].wall:
+					self.memo[box_pos] = float('inf')
+					return float('inf')
+				elif matrix[val[0] + 1][val[1]].wall and matrix[val[0]][val[1] - 1].wall:
+					self.memo[box_pos] = float('inf')
+					return float('inf')
+				elif matrix[val[0] + 1][val[1]].wall and matrix[val[0]][val[1] + 1].wall:
+					self.memo[box_pos] = float('inf')
+					return float('inf')
+			else:
+				targets_left -= 1
+			total += self.buff[val[0]][val[1]]
+		self.memo[box_pos] = total * box_moves * targets_left
+		return (total) * box_moves * targets_left
 
 heuristics = [
 	lambda _: 0,
@@ -150,6 +208,9 @@ heuristics = [
 
 	#Pull distance
 	lambda state: pullDistance(state),
+
+	#New heuristic
+	lambda state: newHeuristic().heuristic2(state)
 ]
 
 def solve(state: State, searchType: int, heuristicType: int, dlsDepth: int = 0, printStates: int = 0):
@@ -158,6 +219,9 @@ def solve(state: State, searchType: int, heuristicType: int, dlsDepth: int = 0, 
 		
 		for i in range(1, 2 if heuristicType != 6 else 6):
 			#print("Heuristic " + str(i))
+			if heuristicType == 5:
+				gameH = newHeuristic()
+				h = lambda state: gameH.heuristic2(state)
 			if heuristicType == 6:
 				# if i == 1:
 				# 	continue
@@ -177,7 +241,7 @@ def solve(state: State, searchType: int, heuristicType: int, dlsDepth: int = 0, 
 			state.heuristicValue = h(state)
 			#openList.append(Node(state, None, 0))
 			heapq.heappush(openList, (state.heuristicValue, Node(state, None, 0)))
-			loop(openList, closed, searchType, dlsDepth, f, printStates)
+			loop(openList, closed, searchType, dlsDepth, f, printStates, heuristicType)
 					
 	else:
 		openList = []
@@ -193,30 +257,27 @@ def loop(
 	dlsDepth,
 	heuristic = (lambda _: 0),
 	printStates = 0,
+	heuristic_type = 0
 ):
-	openList_set = set(openList)
+	finalCosts = collections.defaultdict(lambda:float('inf'))
+	startStart = heapq.heappop(openList)
+	start = startStart[1]
+	heapq.heappush(openList, (start.state.heuristicValue, start))
+	finalCosts[start.state] = 0
+	c = 0
 	while openList:
-		#current = openList.pop(0)
-		current_heuristicvalue, current = heapq.heappop(openList)
-		openList_set.remove((current_heuristicvalue, current))
+		_, current = heapq.heappop(openList)
+		print(current.state)
 		closed.append(current.state)
-		sys.stdout.write(
-			"\r" + str(len(closed)) + " nodes expanded, " 
-			+ str(len(openList)) + " nodes in the open, "
-			+ str(current.depth) + " moves, "
-			+ str(current.state.heuristicValue) + " heuristic value"
-			)
-		sys.stdout.flush()
+		pastCost = finalCosts[current.state]
+		#sys.stdout.write(
+		#	"\r" + str(len(closed)) + " nodes expanded, " 
+		#	+ str(len(openList)) + " nodes in the open, "
+		#	+ str(current.depth) + " moves, "
+		#	+ str(current.state.heuristicValue) + " heuristic value"
+		#	)
+		#sys.stdout.flush()
 		
-		# print("Heuristic value: " + str(current.state.heuristicValue))
-		# print(current.state.box_pos, game.goal, game.is_solved(current.state))
-		# tttt = input()
-		# if tttt == "a":
-		# 	print(current.state.box_pos, game.goal)
-		# elif tttt == "b":
-		# 	for node in openList:
-		# 		print(node.state.box_pos, node.state.heuristicValue)
-					
 		if game.is_solved(current.state):
 			print("\nSolution found for " + game.name[:-1] + ": " + str(current.depth) + " moves")
 			moves_to_solution = []
@@ -229,14 +290,31 @@ def loop(
 			print("")
 			return True
 		else:
-			for new in game.succesors(current.state):
-				if new is not None:
-					new.heuristicValue = heuristic(new)
-				newNode = Node(new, current, current.depth + 1)
-				if new is not None and new not in closed and (new.heuristicValue, newNode) not in openList_set:
-					openList_set.add((new.heuristicValue, newNode))
-					#newNode = Node(new, current, current.depth + 1)
-					appendNewNode(openList, newNode, searchType, dlsDepth, heuristic)
+			if heuristic_type != 5:
+				for new in game.succesors(current.state):
+					if new is not None:
+						new.heuristicValue = heuristic(new)
+					newNode = Node(new, current, current.depth + 1)
+					if new is not None and new not in closed:
+						#newNode = Node(new, current, current.depth + 1)
+						appendNewNode(openList, newNode, searchType, dlsDepth, heuristic)
+			else:
+				for _, newState, cost in game.expand(current.state):
+					if newState is not None:
+						newState.heuristicValue = heuristic(newState)
+					newNode = Node(newState, current, current.depth + 1)
+					newPastCost = pastCost + cost
+					finalCosts[newState] = min(newPastCost,finalCosts[newState])
+					print(pastCost, cost, newPastCost, finalCosts[newState], newState.move_to_reach, newState.player_pos, newState.box_pos,newState.heuristicValue)
+					
+					newNode.depth = finalCosts[newState]
+					if newState is not None and newState not in closed:
+						#newNode = Node(new, current, current.depth + 1)
+						appendNewNode(openList, newNode, searchType, dlsDepth)
+		if c==100:
+			sys.exit()
+		c+=1
+		print(c)
 					
 	if searchType == Search.IDS:
 		dlsDepth += 1
@@ -248,7 +326,7 @@ def loop(
 def main():
 	global game, dist_goal2position
 
-	test_file = "temp.xsb"
+	test_file = "sampleCSD311.xsb"
 	read_file = open(test_file, "r")
 	lines = read_file.readlines()
 	read_file.close()
@@ -282,7 +360,7 @@ def main():
 		dlsDepth = 1
 	
 	if searchType == Search.AStar:
-		print("Heuristic: \n1. Boxes out of place\n2. Euclidean distance\n3. Manhattan distance\n4. Pull distance")
+		print("Heuristic: \n1. Boxes out of place\n2. Euclidean distance\n3. Manhattan distance\n4. Pull distance\n5. New heuristic\n6. All heuristics")
 		heuristicType = int(input("Enter 6 to compare all heuristics: "))
 		# heuristicType = 2
 		
@@ -297,9 +375,11 @@ def main():
 	print("Running search type: " + str(searchType) + " with " + str(heuristicType) + " heuristic\n")
 
 	for current_game in given_games:
-		gameLen = max(len(line) for line in current_game)
+		gameLen = max(len(line) for line in current_game[1:]) - 1
 		game = Sokoban(state=current_game, state_width=gameLen)
 		print("Test Case: " + game.name[:-1])
+		print("Initial state:")
+		game.print_board(game.initial_state())
 		dist_goal2position = distanceToGoal()
 		
 		state = game.initial_state()
