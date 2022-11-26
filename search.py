@@ -92,7 +92,6 @@ def pullDistance(state: State):
 def distanceToGoal():
 	#Initialize distanceToGoal
 	distanceToGoal = np.zeros((len(game.goal), game.gameHeight, game.gameWidth))
-	print(distanceToGoal.shape)
 	distanceToGoal.fill(np.inf)
 	delta = {
 			'u': (-1, 0),
@@ -120,18 +119,15 @@ class newHeuristic:
 	def __init__(self, problem = None):
 		self.problem = game
 		self.buff = self.calc_cost()
-		self.box_state = self.problem.box_state
 		self.memo = dict()
 
 	def calc_cost(self):
 		def flood(x, y, cost):
 			if not visited[x][y]:
-
 				# Update cost if less than previous target
 				if buff[x][y] > cost:
 					buff[x][y] = cost
 				visited[x][y] = True
-
 				# Check adjacent floors
 				if self.problem.map[x - 1][y].floor:
 					flood(x - 1, y, cost + 1)
@@ -145,8 +141,6 @@ class newHeuristic:
 		for target in self.problem.target:
 			visited = [[False for _ in i] for i in self.problem.map]
 			flood(target[0], target[1], 0)
-		print(buff)
-		sys.exit()
 		return buff
 
 	def flood(self, x, y, cost, buff, visited):
@@ -190,6 +184,7 @@ class newHeuristic:
 				targets_left -= 1
 			total += self.buff[val[0]][val[1]]
 		self.memo[box_pos] = total * box_moves * targets_left
+		print(total, box_moves, targets_left)
 		return (total) * box_moves * targets_left
 
 heuristics = [
@@ -210,7 +205,7 @@ heuristics = [
 	lambda state: pullDistance(state),
 
 	#New heuristic
-	lambda state: newHeuristic().heuristic2(state)
+	lambda state: gameH.heuristic2(state)
 ]
 
 def solve(state: State, searchType: int, heuristicType: int, dlsDepth: int = 0, printStates: int = 0):
@@ -219,9 +214,6 @@ def solve(state: State, searchType: int, heuristicType: int, dlsDepth: int = 0, 
 		
 		for i in range(1, 2 if heuristicType != 6 else 6):
 			#print("Heuristic " + str(i))
-			if heuristicType == 5:
-				gameH = newHeuristic()
-				h = lambda state: gameH.heuristic2(state)
 			if heuristicType == 6:
 				# if i == 1:
 				# 	continue
@@ -311,7 +303,7 @@ def loop(
 					if newState is not None and newState not in closed:
 						#newNode = Node(new, current, current.depth + 1)
 						appendNewNode(openList, newNode, searchType, dlsDepth)
-		if c==100:
+		if c==150:
 			sys.exit()
 		c+=1
 		print(c)
@@ -324,9 +316,10 @@ def loop(
 			print("No solution found")
 
 def main():
-	global game, dist_goal2position
+	global game, dist_goal2position, gameH
 
 	test_file = "sampleCSD311.xsb"
+	
 	read_file = open(test_file, "r")
 	lines = read_file.readlines()
 	read_file.close()
@@ -377,6 +370,8 @@ def main():
 	for current_game in given_games:
 		gameLen = max(len(line) for line in current_game[1:]) - 1
 		game = Sokoban(state=current_game, state_width=gameLen)
+		if heuristicType == 5:
+			gameH = newHeuristic()
 		print("Test Case: " + game.name[:-1])
 		print("Initial state:")
 		game.print_board(game.initial_state())

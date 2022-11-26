@@ -109,7 +109,6 @@ class Sokoban(Puzzle):
         boxes - the boxes' positions
         goals - the goals' positions
         '''
-        print(game_raw)
         self.gameHeight = len(game_raw)-1
         self.name = ''.join(list(game_raw[0])[1:][:-2])
         self.gameWidth = gameWidth 
@@ -153,7 +152,6 @@ class Sokoban(Puzzle):
                 else:
                     raise ValueError("Invalid character %s" % char)
         #print("Board generated successfully")
-        self.box_state = copy.deepcopy(boxes)
         self.goal_dict = {i: goal for i, goal in enumerate(self.goal)}
 
         self.map = [[MapTile() for x in range(self.gameWidth)] for y in range(self.gameHeight)]
@@ -163,12 +161,14 @@ class Sokoban(Puzzle):
                     self.map[row][col].wall = True
                 elif (row, col) in self.goal:
                     self.map[row][col].target = True
-                else:
+                    self.map[row][col].floor = True
+                elif self.game[row][col]==0:
                     self.map[row][col].floor = True
         self.target = list(self.goal)
         self.target.sort()
-        self.initial_box_pos = list(boxes)
-        self.initial_box_pos.sort()
+        self.last_box_pos = list(boxes)
+        self.last_box_pos.sort()
+        boxes = self.last_box_pos
         return State(player, boxes, None)
 
     #Make the move
@@ -512,9 +512,9 @@ class Sokoban(Puzzle):
         '''
         moved = 0
         for i in range(len(current.box_pos)):
-            if current.box_pos[i] != self.initial_box_pos[i]:
+            if current.box_pos[i] != self.last_box_pos[i]:
                 moved += 1
-        self.initial_box_pos = current.box_pos
+        self.last_box_pos = current.box_pos
         return moved
     #Check for all possible deadend in the board
     
@@ -589,6 +589,7 @@ if __name__=="__main__":
     gameLen = max(len(line) for line in game_states[game_number][1:]) - 1
     game = Sokoban(state=game_states[game_number], state_width=gameLen)
     start_state = game.state
+    start_state = State(player_pos=(7, 15), box_pos=set([(2, 5), (3, 7), (4, 5), (4, 6), (6, 5), (6, 15)]),move_to_reach=None)
     game.print_board(start_state)
     print(game.expand(start_state))
     #Play the game
