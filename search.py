@@ -22,7 +22,7 @@ def appendNewNode(
 	newNode :Node,
 	searchType,
 	dlsDepth=0,
-	heuristic = (lambda _: 0),
+	heuristicType = 0,
 	):
 	if searchType == Search.BFS:
 		nodes.append(newNode)
@@ -50,7 +50,10 @@ def appendNewNode(
 		#nodes.append(newNode)
 		if newNode.state.heuristicValue > pow(10, 5):
 			return
-		heapq.heappush(nodes, (newNode.state.heuristicValue, newNode))
+		if heuristicType == 4:
+			heapq.heappush(nodes, (newNode.state.heuristicValue, newNode))
+		else:
+			heapq.heappush(nodes, (newNode.depth + newNode.state.heuristicValue, newNode))
 		
 		# else:
 		# 	nodes.append(newNode)
@@ -83,7 +86,7 @@ def manhattanDistance(state: State):
 	return sum
 
 #Assign a box to a goal using hungarian algorithm
-def pullDistance(state: State):
+def pullDistance(state: State, parent: State):
 	#Compute distance between each box and each goal
 	distance_box_goal = np.zeros((len(state.box_pos), len(game.goal)))
 	#Calculate distance between each box and each goal efficiently
@@ -149,7 +152,7 @@ heuristics = [
 	lambda state: manhattanDistance(state),
 
 	#Pull distance
-	lambda state: pullDistance(state),
+	lambda state, parent_state: pullDistance(state, parent_state),
 ]
 
 def solve(state: State, searchType: int, heuristicType: int, dlsDepth: int = 0, printStates: int = 0):
@@ -173,33 +176,34 @@ def solve(state: State, searchType: int, heuristicType: int, dlsDepth: int = 0, 
 				
 			openList = []
 
-			closed = []
-			state.heuristicValue = h(state)
+			closed = set()
+			if heuristicType==4:
+				state.heuristicValue = h(state, None)
+			else:
+				state.heuristicValue = h(state)
 			#openList.append(Node(state, None, 0))
 			heapq.heappush(openList, (state.heuristicValue, Node(state, None, 0)))
-			loop(openList, closed, searchType, dlsDepth, f, printStates)
+			loop(openList, closed, searchType, dlsDepth, f, heuristicType,printStates)
 					
 	else:
 		openList = []
-		closed = []
+		closed = set()
 		openList.append(Node(state, None, 0))
-
 		loop(openList, closed, searchType, dlsDepth, f, printStates)
 
 def loop(
 	openList :list[tuple],
-	closed :list[State],
+	closed :set(),
 	searchType,
 	dlsDepth,
 	heuristic = (lambda _: 0),
+	heuristicType = 0,
 	printStates = 0,
 ):
-	openList_set = set(openList)
 	while openList:
 		#current = openList.pop(0)
-		current_heuristicvalue, current = heapq.heappop(openList)
-		openList_set.remove((current_heuristicvalue, current))
-		closed.append(current.state)
+		_, current = heapq.heappop(openList)
+		closed.add(current.state)
 		sys.stdout.write(
 			"\r" + str(len(closed)) + " nodes expanded, " 
 			+ str(len(openList)) + " nodes in the open, "
@@ -231,12 +235,14 @@ def loop(
 		else:
 			for new in game.succesors(current.state):
 				if new is not None:
-					new.heuristicValue = heuristic(new)
+					if heuristicType==4:
+						new.heuristicValue = heuristic(new, current.state)
+					else:
+						new.heuristicValue = heuristic(new)
 				newNode = Node(new, current, current.depth + 1)
-				if new is not None and new not in closed and (new.heuristicValue, newNode) not in openList_set:
-					openList_set.add((new.heuristicValue, newNode))
+				if new is not None and new not in closed:
 					#newNode = Node(new, current, current.depth + 1)
-					appendNewNode(openList, newNode, searchType, dlsDepth, heuristic)
+					appendNewNode(openList, newNode, searchType, dlsDepth, heuristicType)
 					
 	if searchType == Search.IDS:
 		dlsDepth += 1
@@ -248,7 +254,7 @@ def loop(
 def main():
 	global game, dist_goal2position
 
-	test_file = "temp.xsb"
+	test_file = "presentationsample.xsb"
 	read_file = open(test_file, "r")
 	lines = read_file.readlines()
 	read_file.close()
@@ -282,7 +288,7 @@ def main():
 		dlsDepth = 1
 	
 	if searchType == Search.AStar:
-		print("Heuristic: \n1. Boxes out of place\n2. Euclidean distance\n3. Manhattan distance\n4. Pull distance")
+		print("Heuristic: \n1. Boxes out of place\n2. Euclidean distance\n3. Manhattan distance\n4. Pull distance (Greedy)")
 		heuristicType = int(input("Enter 6 to compare all heuristics: "))
 		# heuristicType = 2
 		
