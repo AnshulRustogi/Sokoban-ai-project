@@ -6,6 +6,13 @@ import sys
 import copy 
 from state import State
 
+delta = {
+    'u': (-1, 0),
+    'd': (1, 0),
+    'l': (0, -1),
+    'r': (0, 1) 
+}
+        
 #sys.tracebacklimit = 0
 class Sokoban(Puzzle):
 
@@ -173,13 +180,6 @@ class Sokoban(Puzzle):
         #Check if box is moved
         box_moved = False
         
-        #Change
-        delta = {
-            'u': (-1, 0),
-            'd': (1, 0),
-            'l': (0, -1),
-            'r': (0, 1) 
-        }
         newState = copy.deepcopy(state)
         
         #Make the move
@@ -279,6 +279,7 @@ class Sokoban(Puzzle):
         Returns a list of all possible moves
         '''
         child = []
+				
         for direction in ['u', 'd', 'l', 'r']:
             temp = self.move(state, direction)
             if temp is not None:
@@ -286,15 +287,124 @@ class Sokoban(Puzzle):
 
         #Rearrange child depending on whether a box is moved or not
         child = sorted(child, key=lambda x: x.move_to_reach.isupper(), reverse=True)
+		
+        # movable_pos = []
+        # for box in state.box_pos:
+        #     for direction in ['u', 'd', 'l', 'r']:
+        #         newPos = (box[0] + delta[direction][0], box[1] + delta[direction][1])
+        #         oppositePos = (box[0] - delta[direction][0], box[1] - delta[direction][1])
+        #         if self.game[newPos[0]][newPos[1]] not in [1, 2, 4] and self.game[oppositePos[0]][oppositePos[1]] not in [1, 2, 4]:
+        #             movable_pos.append(newPos)
+        
+        # open = [state.player_pos]
+        # closed = set()
+        # while open:
+        #     current = open.pop(0)
+        #     closed.add(current)
+        #     for direction in ['u', 'd', 'l', 'r']:
+        #         newPos = (current[0] + delta[direction][0], current[1] + delta[direction][1])
+        #         if self.game[newPos[0]][newPos[1]] not in [1, 2, 4] and newPos not in closed:
+        #             open.append(newPos)
+				
         return child      
         
-    # def getBlockMoves(self, state: State) -> list[State]:
-    #     '''
-    #     Returns a list of all possible block pushes
-    #     '''    
-    #     child = []
-    #     # check all player reachable positions in the current state
+    # game.flood_fill(state, matrix, [], '', state.player_pos[0], state.player_pos[1])
+    def flood_fill(self, state, matrix, path_list, current_path, x, y):
+        # matrix = map
+        box_pos = state.box_pos
+        # stop clause - not reinvoking for when there's floor and a box position and a wall.
+        if state[x][y] not in [1, 2, 4] and matrix[x][y] == 0:
+            matrix[x][y] = 1
+
+            # checks future pos is box
+            if (x - 1, y) in box_pos:
+                if state[x - 2][y] != 1 and (x - 2, y) not in box_pos:
+                    path_list.append(current_path + 'u')
+            if (x + 1, y) in box_pos:
+                if state[x + 2][y] != 1 and (x + 2, y) not in box_pos:
+                    path_list.append(current_path + 'd')
+            if (x, y - 1) in box_pos:
+                if state[x][y - 2] != 1 and (x, y - 2) not in box_pos:
+                    path_list.append(current_path + 'l')
+            if (x, y + 1) in box_pos:
+                if state[x][y + 2] != 1 and (x, y + 2) not in box_pos:
+                    path_list.append(current_path + 'r')
+
+            # checks each direction if visited, if wall, if box
+            if state[x - 1][y] != 1 and (x - 1, y) not in box_pos and matrix[x - 1][y] == 0:
+                self.flood_fill(state, matrix, path_list, current_path + 'u', x - 1, y)
+            if state[x + 1][y] != 1 and (x + 1, y) not in box_pos and matrix[x + 1][y] == 0:
+                self.flood_fill(state, matrix, path_list, current_path + 'd', x + 1, y)
+            if state[x][y - 1] != 1 and (x, y - 1) not in box_pos and matrix[x][y - 1] == 0:
+                self.flood_fill(state, matrix, path_list, current_path + 'l', x, y - 1)
+            if state[x][y + 1] != 1 and (x, y + 1) not in box_pos and matrix[x][y + 1] == 0:
+                self.flood_fill(state, matrix, path_list, current_path + 'r', x, y + 1)
+
+            return path_list
+
+        return path_list
+    
+    def get_position_from_path(self, player, path):
+        for move in path:
+            if move == 'u':
+                player = (player[0] - 1, player[1])
+            elif move == 'd':
+                player = (player[0] + 1, player[1])
+            elif move == 'l':
+                player = (player[0], player[1] - 1)
+            elif move == 'r':
+                player = (player[0], player[1] + 1)
+        return player
+
+    def expand(self, s):
+        if self.dead_end(s):
+            return []
+
+        for i in self.map:
+            for j in i:
+                j.visited = False
+
+        path_list = self.flood_fill(s, self.map, list(), '', s.data[0][0], s.data[0][1])
+
+        new_states = []
+        for path in path_list:
+            # Move player
+            new_player = self.get_position_from_path(s.data[0], path)
+
+            # Move the box
+            box_index = list(s.data[1:]).index(new_player)
+            new_boxes = list(s.data[1:])
+            if path[-1] == 'u':
+                new_boxes[box_index] = (new_boxes[box_index][0] - 1, new_boxes[box_index][1])
+            elif path[-1] == 'd':
+                new_boxes[box_index] = (new_boxes[box_index][0] + 1, new_boxes[box_index][1])
+            elif path[-1] == 'l':
+                new_boxes[box_index] = (new_boxes[box_index][0], new_boxes[box_index][1] - 1)
+            elif path[-1] == 'r':
+                new_boxes[box_index] = (new_boxes[box_index][0], new_boxes[box_index][1] + 1)
+
+            new_states.append(
+                (path, SokobanState(player=new_player, boxes=new_boxes), len(path)))  # consider the cost of each move
+            # new_states.append((path, SokobanState(player=new_player, boxes=new_boxes), 1))  # uniform cost for a box push
+
+        return new_states
         
+    def getBlockMoves(self, state: State) -> list[State]:
+        '''
+        Returns a list of all possible block pushes
+        '''    
+        reachable = [state.player_pos]
+        child = []
+        # search the map from player position to reachable positions
+        while len(reachable) > 0:
+            pos = reachable.pop(0)
+            for direction in ['u', 'd', 'l', 'r']:
+                newPos = (pos[0] + delta[direction][0], pos[1] + delta[direction][1])
+                if newPos in state.box_pos:
+                    newPositionDash = (newPos[0] + delta[direction][0], newPos[1] + delta[direction][1])
+                    if self.game[newPositionDash[0]][newPositionDash[1]]==0 and newPositionDash not in state.box_pos:
+                        child.append(self.move(state, direction))
+                        reachable.append(newPositionDash)
     
     #Check for all possible deadend in the board
     def deadend(self, state: State) -> bool:

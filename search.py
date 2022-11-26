@@ -1,14 +1,12 @@
-import math
-from sokoban import Sokoban
-from node import Node
-import sys
-from state import State
+import heapq
+
 import numpy as np
 import scipy.optimize
-import heapq
-import threading
-import multiprocessing
-from multiprocessing import Pool
+
+from node import Node
+from sokoban import Sokoban
+from state import State
+
 
 class Search():
 	BFS = 1
@@ -199,16 +197,22 @@ def loop(
 		#current = openList.pop(0)
 		current = heapq.heappop(openList)[1]
 		closed.append(current.state)
-		sys.stdout.write(
-			"\r" + str(len(closed)) + " nodes expanded, " 
-			+ str(len(openList)) + " nodes in the open, "
-			+ str(current.depth) + " moves, "
-			+ str(current.state.heuristicValue) + " heuristic value"
-			)
-		sys.stdout.flush()
 		
-		# print("Heuristic value: " + str(current.state.heuristicValue))
+		game.print_board(current.state)
+		input()
+		# sys.stdout.write(
+		# 	"\r" + str(len(closed)) + " nodes expanded, " 
+		# 	+ str(len(openList)) + " nodes in the open, "
+		# 	+ str(current.depth) + " moves, "
+		# 	+ str(current.state.heuristicValue) + " heuristic value"
+		# 	)
+		# sys.stdout.flush()
+		
+		
+		
+		# print("\nHeuristic value: " + str(current.state.heuristicValue))
 		# print(current.state.box_pos, game.goal, game.is_solved(current.state))
+		# game.print_board(current.state)
 		# tttt = input()
 		# if tttt == "a":
 		# 	print(current.state.box_pos, game.goal)
@@ -245,7 +249,7 @@ def loop(
 def main():
 	global game, dist_goal2position
 
-	test_file = "test4.xsb"
+	test_file = "game.xsb"
 	read_file = open(test_file, "r")
 	lines = read_file.readlines()
 	read_file.close()
@@ -300,7 +304,10 @@ def main():
 		dist_goal2position = distanceToGoal()
 		
 		state = game.initial_state()
-		solve(state, searchType, heuristicType, dlsDepth, printStates)
+		# matrix of zeros with the same size as the board
+		matrix = [[0 for _ in range(game.width)] for _ in range(game.height)]
+		game.flood_fill(state, matrix, [], '', state.player_pos[0], state.player_pos[1])
+		# solve(state, searchType, heuristicType, dlsDepth, printStates)
 		
 		#print("1. Play")
 		#print("2. Solve")
