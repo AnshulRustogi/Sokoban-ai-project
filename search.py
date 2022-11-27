@@ -194,12 +194,13 @@ def loop(
 	heuristic = (lambda _: 0),
 	printStates = 0,
 ):
-	openList_set = set(openList)
+	#openList_set = set(openList)
+	closed = dict()
 	while openList:
 		#current = openList.pop(0)
 		current_heuristicvalue, current = heapq.heappop(openList)
-		openList_set.remove((current_heuristicvalue, current))
-		closed.append(current.state)
+		#openList_set.remove((current_heuristicvalue, current))
+		closed[current.state] = current
 		sys.stdout.write(
 			"\r" + str(len(closed)) + " nodes expanded, " 
 			+ str(len(openList)) + " nodes in the open, "
@@ -233,11 +234,16 @@ def loop(
 				if new is not None:
 					new.heuristicValue = heuristic(new)
 				newNode = Node(new, current, current.depth + 1)
-				if new is not None and new not in closed and (new.heuristicValue, newNode) not in openList_set:
-					openList_set.add((new.heuristicValue, newNode))
+				if new is not None and new not in closed:
 					#newNode = Node(new, current, current.depth + 1)
 					appendNewNode(openList, newNode, searchType, dlsDepth, heuristic)
-					
+				if new in closed:
+					#Old f value
+					old_f = closed[new].state.heuristicValue
+					if old_f > new.heuristicValue:
+						appendNewNode(openList, newNode, searchType, dlsDepth, heuristic)
+						del closed[new]
+					#Check if 	
 	if searchType == Search.IDS:
 		dlsDepth += 1
 		if dlsDepth <= 2:
@@ -248,7 +254,7 @@ def loop(
 def main():
 	global game, dist_goal2position
 
-	test_file = "temp.xsb"
+	test_file = "projectTest.xsb"
 	read_file = open(test_file, "r")
 	lines = read_file.readlines()
 	read_file.close()
@@ -304,36 +310,6 @@ def main():
 		
 		state = game.initial_state()
 		solve(state, searchType, heuristicType, dlsDepth, printStates)
-		
-		#print("1. Play")
-		#print("2. Solve")
-		#print("3. Random")
-		#print("4. Exit")
-		#choice = int(input())
-		# choice = 2
-		#if choice == 1:
-		#	while True:
-		#		temp = game.move(state, input("Please enter a move [u, d, l, r]: "))
-		#		if temp is not None:
-		#			state = temp
-		#			game.print_board(state)
-		#			print("Move made: " + state.move_to_reach)
-		#			if game.is_solved(state):
-		#				print("You win!")
-		#				break
-			
-		#elif choice == 2:
-		#	solve(state)
-		#elif choice == 3:
-		#	state = state.play(10)
-		#	state.print_board()
-		#elif choice == 3:
-		#	return
-		#elif choice == 4:
-		#	return
-		#else:
-		#	print("Invalid input")
-		#	return
 
 	
 if __name__ == '__main__':
