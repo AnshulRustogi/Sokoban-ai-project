@@ -6,7 +6,6 @@ from state import State
 import numpy as np
 import scipy.optimize
 import heapq
-from multiprocessing import Pool
 
 class Search():
 	BFS = 1
@@ -20,7 +19,7 @@ def appendNewNode(
 	newNode :Node,
 	searchType,
 	dlsDepth=0,
-	heuristicType = 0,
+	heuristicType=0,
 	):
 	if searchType == Search.BFS:
 		nodes.append(newNode)
@@ -29,19 +28,20 @@ def appendNewNode(
 	elif searchType == Search.DLS:
 		if newNode.depth <= dlsDepth:
 			nodes.insert(0, newNode)
+		# else:
+		# 	nodes.append(newNode)
 	elif searchType == Search.IDS:
 		if newNode.depth <= dlsDepth:
 			nodes.insert(0, newNode)
 	elif searchType == Search.AStar:
 		if newNode.state.heuristicValue > pow(10, 5):
 			return
-		if heuristicType == 4:
+		if heuristicType==4:
+			#Greedy
 			heapq.heappush(nodes, (newNode.state.heuristicValue, newNode))
 		else:
-			heapq.heappush(nodes, (newNode.depth + newNode.state.heuristicValue, newNode))
-		
-		# else:
-		# 	nodes.append(newNode)
+			#A*
+			heapq.heappush(nodes, (newNode.state.heuristicValue + newNode.depth, newNode))
 
 def boxesOutOfPlace(state: State):
 	a = np.array(state.box_pos)
@@ -71,7 +71,7 @@ def manhattanDistance(state: State):
 	return sum
 
 #Assign a box to a goal using hungarian algorithm
-def pullDistance(state: State, parent: State):
+def pullDistance(state: State):
 	#Compute distance between each box and each goal
 	distance_box_goal = np.zeros((len(state.box_pos), len(game.goal)))
 	#Calculate distance between each box and each goal efficiently
@@ -79,9 +79,12 @@ def pullDistance(state: State, parent: State):
 		for j in range(len(game.goal)):
 			distance_box_goal[i][j] = dist_goal2position[j][box_position[0]][box_position[1]]
 	#Assign a box to a goal using hungarian algorithm
+	#print(distance_box_goal)
 	distance_box_goal[distance_box_goal == np.inf] = 100000000000000000000
 	#print(distance_box_goal)
 	row_ind, col_ind = scipy.optimize.linear_sum_assignment(distance_box_goal)
+	#print(row_ind, col_ind)
+	#sys.exit()
 	h = sum( [distance_box_goal[i,j] for i,j in zip(row_ind, col_ind)])
 	
 	#Calculate distance between player and each box
@@ -122,16 +125,19 @@ def distanceToGoal():
 heuristics = [
 	lambda _: 0,
 	# Boxes out of place
+	# lambda state: sum([1 for i in range(game.boxes) if state.boxes[i] in game.goal]),
 	lambda state: boxesOutOfPlace(state),
 	
 	# Euclidean distance
+	# lambda state: sum([abs((state.boxes[i] - game.goals[i]) % 3) + abs((state.boxes[i] - game.goals[i]) // 3) for i in range(game.boxes)]),
 	lambda state: euclideanDistance(state),
 	
 	# Manhattan distance
+	# lambda state: sum([abs((state.boxes[i] - game.goals[i]) % 3) + abs((state.boxes[i] - game.goals[i]) // 3) for i in range(game.boxes)]),
 	lambda state: manhattanDistance(state),
 
 	#Pull distance
-	lambda state, parent_state: pullDistance(state, parent_state),
+	lambda state: pullDistance(state),
 ]
 
 def solve(state: State, searchType: int, heuristicType: int, dlsDepth: int = 0, printStates: int = 0):
@@ -155,29 +161,26 @@ def solve(state: State, searchType: int, heuristicType: int, dlsDepth: int = 0, 
 				
 			openList = []
 
-			closed = set()
-			if heuristicType==4:
-				state.heuristicValue = h(state, None)
-			else:
-				state.heuristicValue = h(state)
+			closed = []
+			state.heuristicValue = h(state)
 			#openList.append(Node(state, None, 0))
 			heapq.heappush(openList, (state.heuristicValue, Node(state, None, 0)))
-			loop(openList, closed, searchType, dlsDepth, f, heuristicType,printStates)
+			loop(openList, searchType, dlsDepth, f, printStates,heuristicType)
 					
 	else:
 		openList = []
-		closed = set()
+		closed = []
 		openList.append(Node(state, None, 0))
-		loop(openList, closed, searchType, dlsDepth, f, printStates)
+
+		loop(openList, searchType, dlsDepth, f, printStates, heuristicType)
 
 def loop(
 	openList :list[tuple],
-	closed :set(),
 	searchType,
 	dlsDepth,
 	heuristic = (lambda _: 0),
-	heuristicType = 0,
 	printStates = 0,
+	heuristicType = 0,
 ):
 	closed = dict()
 	while openList:
@@ -205,18 +208,16 @@ def loop(
 		else:
 			for new in game.succesors(current.state):
 				if new is not None:
-					if heuristicType==4:
-						new.heuristicValue = heuristic(new, current.state)
-					else:
-						new.heuristicValue = heuristic(new)
+					new.heuristicValue = heuristic(new)
 				newNode = Node(new, current, current.depth + 1)
 				if new is not None and new not in closed:
-					appendNewNode(openList, newNode, searchType, dlsDepth, heuristic)
+					appendNewNode(openList, newNode, searchType, dlsDepth, heuristicType)
 				if new in closed:
 					#Old f value
 					old_f = closed[new].state.heuristicValue
+					#Check if new f value is better
 					if old_f > new.heuristicValue:
-						appendNewNode(openList, newNode, searchType, dlsDepth, heuristic)
+						appendNewNode(openList, newNode, searchType, dlsDepth, heuristicType)
 						del closed[new]
 					#Check if 	
 	if searchType == Search.IDS:
@@ -229,7 +230,7 @@ def loop(
 def main():
 	global game, dist_goal2position
 
-	test_file = "projectTest.xsb"
+	test_file = "testExamples.xsb"
 	read_file = open(test_file, "r")
 	lines = read_file.readlines()
 	read_file.close()
@@ -263,7 +264,7 @@ def main():
 		dlsDepth = 1
 	
 	if searchType == Search.AStar:
-		print("Heuristic: \n1. Boxes out of place\n2. Euclidean distance\n3. Manhattan distance\n4. Pull distance (Greedy)")
+		print("Heuristic: \n1. Boxes out of place\n2. Euclidean distance\n3. Manhattan distance\n4. Pull distance (greedy)")
 		heuristicType = int(input("Enter 6 to compare all heuristics: "))
 		# heuristicType = 2
 		
@@ -275,6 +276,7 @@ def main():
 		f = lambda _: 0
 		heuristicType = -1
 	printStates = int(input("Print solution states? 1 for yes, 0 for no: "))
+	print("Running search on file: " + test_file + "\n")
 	print("Running search type: " + str(searchType) + " with " + str(heuristicType) + " heuristic\n")
 
 	for current_game in given_games:
