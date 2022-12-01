@@ -28,8 +28,6 @@ def appendNewNode(
 	elif searchType == Search.DLS:
 		if newNode.depth <= dlsDepth:
 			nodes.insert(0, newNode)
-		# else:
-		# 	nodes.append(newNode)
 	elif searchType == Search.IDS:
 		if newNode.depth <= dlsDepth:
 			nodes.insert(0, newNode)
@@ -136,7 +134,7 @@ heuristics = [
 	# lambda state: sum([abs((state.boxes[i] - game.goals[i]) % 3) + abs((state.boxes[i] - game.goals[i]) // 3) for i in range(game.boxes)]),
 	lambda state: manhattanDistance(state),
 
-	#Pull distance
+	#Pull distance + hungrarian assignment
 	lambda state: pullDistance(state),
 ]
 
@@ -153,25 +151,15 @@ def solve(state: State, searchType: int, heuristicType: int, dlsDepth: int = 0, 
 			else:
 				h = heuristics[heuristicType]
 			
-			# if heuristicType == 5:
-			# 	f = lambda Node: Node.depth + 2 * h(Node.state)
-			# else:
-			# 	f = lambda Node: Node.depth + h(Node.state)
 			f = h
-				
 			openList = []
-
-			closed = []
 			state.heuristicValue = h(state)
-			#openList.append(Node(state, None, 0))
 			heapq.heappush(openList, (state.heuristicValue, Node(state, None, 0)))
 			loop(openList, searchType, dlsDepth, f, printStates,heuristicType)
 					
 	else:
 		openList = []
-		closed = []
 		openList.append(Node(state, None, 0))
-
 		loop(openList, searchType, dlsDepth, f, printStates, heuristicType)
 
 def loop(
@@ -202,11 +190,17 @@ def loop(
 					game.print_board(current.state)
 				moves_to_solution.append(current.state.move_to_reach)
 				current = current.parent
-			print("Moves to solution: " + str("".join(moves_to_solution[::-1][1:])))
+			moves_to_solution = str("".join(moves_to_solution[::-1][1:]))
+			print("Moves to solution: " + moves_to_solution)
+			#Export solution to file
+			with open("solution_" + game.name[:-1] + ".txt", "w") as f:
+				f.write(moves_to_solution)
 			print("")
 			return True
 		else:
 			for new in game.succesors(current.state):
+				if new is None:	
+					continue	
 				if new is not None:
 					new.heuristicValue = heuristic(new)
 				newNode = Node(new, current, current.depth + 1)
@@ -230,7 +224,12 @@ def loop(
 def main():
 	global game, dist_goal2position
 
-	test_file = "testExamples.xsb"
+	#Take test_file as argument
+	if len(sys.argv) > 1:
+		test_file = sys.argv[1]
+	else:
+		test_file = "test.txt"
+	
 	read_file = open(test_file, "r")
 	lines = read_file.readlines()
 	read_file.close()

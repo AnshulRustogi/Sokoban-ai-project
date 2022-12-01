@@ -25,13 +25,6 @@ class Sokoban(Puzzle):
             self.state = self.generate_board(state_width, state)
             return
 
-    '''
-    def generate_board_from_state(self, state, test_name: str):
-        self.test_name = test_name
-        gameWidth = len(state[0])
-        return self.generate_board(gameWidth, state, from_state=False)
-    '''
-
     def initial_state(self):
         return self.state
 
@@ -106,26 +99,20 @@ class Sokoban(Puzzle):
             for col, char in enumerate(line):
                 if char == ' ':
                     continue
-                #    self.game[row][col] = 0
                 if char == '#':
                     self.game[row][col] = 1
                     continue
                 if char == '$':
-                #    self.game[row][col] = 2
                     boxes.add((row, col))
                 elif char == '.':
-                    #self.game[row][col] = 3
                     self.goal.add((row, col))
                 elif char == '*':
-                    #self.game[row][col] = 4
                     boxes.add((row, col))
                     self.goal.add((row, col))
                     self.number_of_goal += 1
                 elif char == '@':
-                #    self.game[row][col] = 5
                     player = (row, col)
                 elif char == '+':
-                #    self.game[row][col] = 6
                     player = (row, col)
                     self.goal.add((row, col))
                     self.number_of_goal += 1
@@ -133,7 +120,6 @@ class Sokoban(Puzzle):
                     break
                 else:
                     raise ValueError("Invalid character %s" % char)
-        #print("Board generated successfully")
         self.goal_dict = {i: goal for i, goal in enumerate(self.goal)}
         return State(player, boxes, None)
 
@@ -141,9 +127,7 @@ class Sokoban(Puzzle):
     def move(self, state: State, direction: str):
         '''
         If the move is valid it returns the new state, move else returns None
-        '''
-
-        '''
+        
         Moves the player in the given direction
         Possible directions are:
         u: up
@@ -155,11 +139,6 @@ class Sokoban(Puzzle):
         Labels:
         0 = empty space
         1 = wall
-        2 = box
-        3 = goal
-        4 = box on goal
-        5 = player
-        6 = player on goal
         '''
         #Check if the direction is valid
         if direction not in ['u', 'd', 'l', 'r']:
@@ -185,22 +164,8 @@ class Sokoban(Puzzle):
         #Make the move
         newPos = (player[0] + delta[direction][0], player[1] + delta[direction][1])
         if self.game[newPos[0]][newPos[1]] in [0, 3]:
-            #Make current position empty
-            #self.game[player[0]][player[1]] = 0
-            #Make new position player
-            #self.game[newPos[0]][newPos[1]] = 5
             newState.player_pos = newPos
-            
-            #If the player is on a goal
-            #if newPos in self.goal:
-            #    self.game[newPos[0]][newPos[1]] = 6
-            #If the player was on a goal
-            #if player in self.goal:
-            #    self.game[player[0]][player[1]] = 3
-            
-            #if update_self:
-            #    player = newPos
-
+        
         #Check if the new position is a wall
         if self.game[newPos[0]][newPos[1]] == 1:
             return None
@@ -214,30 +179,9 @@ class Sokoban(Puzzle):
             #If the box is not below a wall or another box, move the box and update the game board
             else:
                 box_moved = True
-                #Set current position to empty space
-                #self.game[self.player[0]][self.player[1]] = 0
-                #Set new position to player
-                #self.game[newPos[0]][newPos[1]] = 5
                 newState.player_pos = newPos
-                #If the player is on a goal
-                #if self.player in self.goal:
-                #    self.game[newPos[0]][newPos[1]] = 6
-                #if self.player in self.goal:
-                #    self.game[self.player[0]][self.player[1]] = 3
-                
-                #if update_self:
-                #    self.player = newPos
-                
-                #Set the box's new position to a box
-                #self.game[newPositionDash[0]][newPositionDash[1]] = 2
-                #if update_self:
-                #    self.boxes.add(newPositionDash)
-                #    self.boxes.remove(newPos)
                 newState.box_pos.add(newPositionDash)
                 newState.box_pos.remove(newPos)
-                #Check if the new position of the box is a goal
-                #if newPositionDash in self.goal:
-                #    self.game[newPositionDash[0]][newPositionDash[1]] = 4
         
         newState.move_to_reach = direction.upper() if box_moved else direction.lower()
         return newState
@@ -247,16 +191,11 @@ class Sokoban(Puzzle):
         Checks if the game is solved i.e. all boxes are on goals
         '''
         return state.box_pos == self.goal
-        # use a loop
-        # for box in state.box_pos:
-        #     if box not in self.goal:
-        #         return False
-
+        
     def print_board(self,state) -> None:
         '''
-        Prints the board
+        Prints the board using pandas dataframe
         '''
-
         tempData = DataFrame(self.game).replace(0, ' ').replace(1, '#')
         for goal in self.goal:
             tempData.iloc[goal[0], goal[1]] = '.'
@@ -286,16 +225,8 @@ class Sokoban(Puzzle):
 
         #Rearrange child depending on whether a box is moved or not
         child = sorted(child, key=lambda x: x.move_to_reach.isupper(), reverse=True)
-        return child      
-        
-    # def getBlockMoves(self, state: State) -> list[State]:
-    #     '''
-    #     Returns a list of all possible block pushes
-    #     '''    
-    #     child = []
-    #     # check all player reachable positions in the current state
-        
-    
+        return child
+
     #Check for all possible deadend in the board
     def deadend(self, state: State) -> bool:
         '''
@@ -312,41 +243,14 @@ class Sokoban(Puzzle):
             u = self.game[box[0]-1][box[1]]
             d = self.game[box[0]+1][box[1]]
 
-            # #Deadend 1: Box is in a ditch
-            # #Check if any 3 of the 4 directions are walls or boxes
-            # if(((l == 1 or l == 2) and (r == 1 or r == 2) and (u == 1 or u == 2)
-            # or (l == 1 or l == 2) and (r == 1 or r == 2) and (d == 1 or d == 2)
-            # or (l == 1 or l == 2) and (u == 1 or u == 2) and (d == 1 or d == 2)
-            # or (r == 1 or r == 2) and (u == 1 or u == 2) and (d == 1 or d == 2))):
-            #     #Check if the box is not on a goal
-            #     if box not in self.goal:
-            #         return True
-            
             #Box is in a corner
             #Check if any 2 of the 4 directions are walls
             if (l == 1 and u == 1) or (l == 1 and d == 1) or (r == 1 and u == 1) or (r == 1 and d == 1):
                 #Check if the box is not on a goal
                 if box not in self.goal:
                     return True
-            '''
-            For one side wall, we can check if there are any walls in a two block wide line, or if the goal is
-            If not then this too
-            '''   
+
         return False
-
-    @staticmethod
-    def get_box_coords(state):
-        '''
-        Returns a list of box coordinates
-        '''
-        return state.box_pos
-
-    @staticmethod
-    def get_player_coords(state: str):
-        '''
-        Returns the player coordinates
-        '''
-        return state.player_pos
 
 if __name__=="__main__":   
     test_file = "sampleCSD311.xsb"
